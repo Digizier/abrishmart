@@ -36,6 +36,9 @@ import {
   Building2,
   Boxes,
   Clock,
+  X,
+  Tag,
+  FolderPlus,
 } from "lucide-react";
 import { Product, Category, Order, Banner, SiteSettings } from "@/lib/types";
 import {
@@ -47,6 +50,9 @@ import {
   adminDeleteProduct,
   adminSaveCategory,
   adminDeleteCategory,
+  adminAddSubcategory,
+  adminAddChildSubcategory,
+  adminDeleteSubcategory,
   adminUpdateOrderStatus,
   adminUpdateOrderHhcDispatch,
   adminSaveSettings,
@@ -158,6 +164,17 @@ export default function AdminPage() {
 
   // File Upload States
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [galleryUploading, setGalleryUploading] = useState(false);
+
+  // Multi-level Subcategory State
+  const [addingSubcatFor, setAddingSubcatFor] = useState<string | null>(null);
+  const [newSubcatName, setNewSubcatName] = useState("");
+  const [addingChildFor, setAddingChildFor] = useState<{ catSlug: string; subSlug: string } | null>(null);
+  const [newChildName, setNewChildName] = useState("");
+
+  // Product Modal Variations
+  const [sizesInput, setSizesInput] = useState("");
+  const [colorsInput, setColorsInput] = useState("");
 
   // Check auth on load
   useEffect(() => {
@@ -534,6 +551,75 @@ export default function AdminPage() {
     }
   };
 
+  // Multiple Gallery Upload with WebP auto-compression
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setGalleryUploading(true);
+    const uploadedUrls: string[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const { url } = await compressAndUploadImage(file, "product-galleries");
+      if (url) uploadedUrls.push(url);
+    }
+
+    setGalleryUploading(false);
+
+    if (uploadedUrls.length > 0) {
+      setEditingProduct((prev) => {
+        const existingGallery = prev?.gallery_urls || [];
+        const merged = [...existingGallery, ...uploadedUrls];
+        return {
+          ...(prev || {}),
+          gallery_urls: merged,
+          thumbnail_url: prev?.thumbnail_url || uploadedUrls[0] || "",
+        };
+      });
+      showToast(`✅ Added ${uploadedUrls.length} image(s) to product gallery!`);
+    }
+  };
+
+  const handleRemoveGalleryImage = (indexToRemove: number) => {
+    setEditingProduct((prev) => {
+      const currentGallery = [...(prev?.gallery_urls || [])];
+      currentGallery.splice(indexToRemove, 1);
+      return {
+        ...(prev || {}),
+        gallery_urls: currentGallery,
+        thumbnail_url: currentGallery[0] || prev?.thumbnail_url || "",
+      };
+    });
+  };
+
+  // Subcategory management handlers
+  const handleAddSubcategory = async (catSlug: string) => {
+    if (!newSubcatName.trim()) return;
+    const subSlug = newSubcatName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    await adminAddSubcategory(catSlug, newSubcatName.trim(), subSlug);
+    setNewSubcatName("");
+    setAddingSubcatFor(null);
+    showToast(`✅ Added subcategory "${newSubcatName.trim()}"`);
+    loadData(false);
+  };
+
+  const handleAddChildSubcategory = async (catSlug: string, subSlug: string) => {
+    if (!newChildName.trim()) return;
+    const childSlug = newChildName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    await adminAddChildSubcategory(catSlug, subSlug, newChildName.trim(), childSlug);
+    setNewChildName("");
+    setAddingChildFor(null);
+    showToast(`✅ Added nested child subcategory "${newChildName.trim()}"`);
+    loadData(false);
+  };
+
+  const handleDeleteSubcategory = async (catSlug: string, subSlug: string) => {
+    await adminDeleteSubcategory(catSlug, subSlug);
+    showToast("Subcategory deleted.");
+    loadData(false);
+  };
+
   // Save product handler
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -541,6 +627,15 @@ export default function AdminPage() {
       showToast("❌ Product title and price are required.");
       return;
     }
+
+    const sizes = sizesInput
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const colors = colorsInput
+      .split(",")
+      .map((c) => c.trim())
+      .filter(Boolean);
 
     const payload: Partial<Product> = {
       ...editingProduct,
@@ -552,10 +647,24 @@ export default function AdminPage() {
           .replace(/^-|-$/g, ""),
       price: Number(editingProduct.price),
       original_price: editingProduct.original_price ? Number(editingProduct.original_price) : undefined,
-      stock: Number(editingProduct.stock || 10),
-      category_slug: editingProduct.category_slug || categories[0]?.slug || "general",
-      thumbnail_url: editingProduct.thumbnail_url || "/images/banners/hero-banner.png",
-      gallery_urls: editingProduct.gallery_urls || [editingProduct.thumbnail_url || "/images/banners/hero-banner.png"],
+      wholesale_price: editingProduct.wholesale_price ? Number(editingProduct.wholesale_price) : undefined,
+      stock: Number(editingProduct.stock ?? 15),
+      sku: editingProduct.sku || `ABM-${Math.floor(1000 + Math.random() * 9000)}`,
+      category_slug: editingProduct.category_slug || categories[0]?.slug || "bridal-silk-nightwear",
+      subcategory_slug: editingProduct.subcategory_slug || undefined,
+      child_subcategory_slug: editingProduct.child_subcategory_slug || undefined,
+      thumbnail_url: editingProduct.thumbnail_url || editingProduct.gallery_urls?.[0] || "/images/banners/hero-banner.png",
+      gallery_urls:
+        editingProduct.gallery_urls && editingProduct.gallery_urls.length > 0
+          ? editingProduct.gallery_urls
+          : [editingProduct.thumbnail_url || "/images/banners/hero-banner.png"],
+      variations: {
+        sizes: sizes.length > 0 ? sizes : undefined,
+        colors: colors.length > 0 ? colors : undefined,
+      },
+      is_active: editingProduct.is_active ?? true,
+      is_flash_deal: editingProduct.is_flash_deal ?? false,
+      is_featured: editingProduct.is_featured ?? false,
     };
 
     const res = await adminSaveProduct(payload);
@@ -966,13 +1075,21 @@ export default function AdminPage() {
                   onClick={() => {
                     setEditingProduct({
                       title: "",
-                      price: 0,
-                      stock: 15,
+                      sku: `ABM-${Math.floor(1000 + Math.random() * 9000)}`,
+                      price: 1500,
+                      original_price: 2200,
+                      wholesale_price: 900,
+                      stock: 25,
                       category_slug: categories[0]?.slug || "bridal-silk-nightwear",
+                      subcategory_slug: categories[0]?.subcategories?.[0]?.slug || undefined,
+                      thumbnail_url: "",
+                      gallery_urls: [],
                       is_active: true,
                       is_featured: false,
                       is_flash_deal: false,
                     });
+                    setSizesInput("Small, Medium, Large, XL");
+                    setColorsInput("");
                     setProductModalOpen(true);
                   }}
                   className="flex items-center gap-1.5 px-4 py-2 bg-brand-pink hover:bg-brand-pinkHover text-white text-xs font-extrabold rounded-xl shadow-md shadow-brand-pink/20 transition"
@@ -989,87 +1106,125 @@ export default function AdminPage() {
                 <table className="w-full text-left text-xs divide-y divide-slate-100">
                   <thead className="bg-slate-50 text-slate-600 font-bold uppercase text-[10px]">
                     <tr>
-                      <th className="p-3.5">Item</th>
-                      <th className="p-3.5">Category</th>
-                      <th className="p-3.5">Price</th>
+                      <th className="p-3.5">Item & SKU</th>
+                      <th className="p-3.5">Department & Subcategory</th>
+                      <th className="p-3.5">Wholesale / Sale</th>
                       <th className="p-3.5">Stock</th>
-                      <th className="p-3.5">Status</th>
+                      <th className="p-3.5">Badges</th>
                       <th className="p-3.5 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
-                    {products.map((prod) => (
-                      <tr key={prod.id} className="hover:bg-slate-50 transition">
-                        <td className="p-3.5 flex items-center gap-3">
-                          <div className="relative w-12 h-12 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
-                            <Image
-                              src={prod.thumbnail_url || "/images/banners/hero-banner.png"}
-                              alt={prod.title}
-                              fill
-                              sizes="48px"
-                              className="object-cover"
-                              unoptimized
-                            />
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900 line-clamp-1">{prod.title}</p>
-                            <p className="text-[10px] text-slate-400 font-mono">{prod.sku || prod.slug}</p>
-                          </div>
-                        </td>
-                        <td className="p-3.5 text-slate-600 capitalize">
-                          {prod.category_slug.replace(/-/g, " ")}
-                        </td>
-                        <td className="p-3.5 font-bold text-brand-pink">
-                          Rs. {prod.price.toLocaleString()}
-                        </td>
-                        <td className="p-3.5">
-                          <span
-                            className={`px-2 py-0.5 rounded font-bold text-[10px] ${
-                              prod.stock > 5
-                                ? "bg-emerald-50 text-emerald-700"
-                                : "bg-rose-50 text-rose-700"
-                            }`}
-                          >
-                            {prod.stock} in stock
-                          </span>
-                        </td>
-                        <td className="p-3.5">
-                          {prod.is_active ? (
-                            <span className="text-emerald-600 font-bold text-[11px]">Active</span>
-                          ) : (
-                            <span className="text-slate-400 font-bold text-[11px]">Draft</span>
-                          )}
-                        </td>
-                        <td className="p-3.5 text-right space-x-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingProduct(prod);
-                              setProductModalOpen(true);
-                            }}
-                            className="p-1.5 text-slate-600 hover:text-brand-pink hover:bg-slate-100 rounded-lg transition"
-                            title="Edit Product"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setDeleteConfirm({
-                                open: true,
-                                type: "product",
-                                id: prod.id,
-                                title: prod.title,
-                              })
-                            }
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                            title="Delete Product"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {products.map((prod) => {
+                      const matchedCat = categories.find((c) => c.slug === prod.category_slug);
+                      const matchedSub = matchedCat?.subcategories?.find((s) => s.slug === prod.subcategory_slug);
+
+                      return (
+                        <tr key={prod.id} className="hover:bg-slate-50 transition">
+                          <td className="p-3.5 flex items-center gap-3">
+                            <div className="relative w-12 h-12 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
+                              <Image
+                                src={prod.thumbnail_url || "/images/banners/hero-banner.png"}
+                                alt={prod.title}
+                                fill
+                                sizes="48px"
+                                className="object-cover"
+                                unoptimized
+                              />
+                            </div>
+                            <div className="min-w-0 max-w-xs">
+                              <p className="font-bold text-slate-900 line-clamp-1" title={prod.title}>{prod.title}</p>
+                              <p className="text-[10px] text-slate-400 font-mono">{prod.sku || prod.slug}</p>
+                            </div>
+                          </td>
+                          <td className="p-3.5">
+                            <div className="space-y-0.5">
+                              <p className="font-bold text-slate-800 text-[11px] capitalize">
+                                {matchedCat?.name || prod.category_slug.replace(/-/g, " ")}
+                              </p>
+                              {matchedSub && (
+                                <span className="bg-slate-100 text-slate-600 text-[9px] font-bold px-1.5 py-0.2 rounded inline-block">
+                                  {matchedSub.name}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3.5">
+                            <div className="space-y-0.5">
+                              <p className="font-bold text-slate-900">Rs. {prod.price.toLocaleString()}</p>
+                              {prod.wholesale_price && (
+                                <p className="text-[10px] text-slate-400 font-mono">
+                                  Cost: Rs. {prod.wholesale_price.toLocaleString()} (+Rs. {prod.price - prod.wholesale_price})
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3.5">
+                            <span
+                              className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                                prod.stock > 5
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-rose-50 text-rose-700"
+                              }`}
+                            >
+                              {prod.stock} in stock
+                            </span>
+                          </td>
+                          <td className="p-3.5">
+                            <div className="flex flex-wrap gap-1">
+                              {prod.is_flash_deal && (
+                                <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.2 rounded">
+                                  ⚡ Flash
+                                </span>
+                              )}
+                              {prod.is_featured && (
+                                <span className="bg-purple-100 text-purple-800 text-[9px] font-bold px-1.5 py-0.2 rounded">
+                                  Featured
+                                </span>
+                              )}
+                              {prod.is_active ? (
+                                <span className="text-emerald-600 font-bold text-[10px]">Active</span>
+                              ) : (
+                                <span className="text-slate-400 font-bold text-[10px]">Draft</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3.5 text-right space-x-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingProduct({
+                                  ...prod,
+                                  gallery_urls: prod.gallery_urls || [prod.thumbnail_url],
+                                });
+                                setSizesInput(prod.variations?.sizes?.join(", ") || "");
+                                setColorsInput(prod.variations?.colors?.join(", ") || "");
+                                setProductModalOpen(true);
+                              }}
+                              className="p-1.5 text-slate-600 hover:text-brand-pink hover:bg-slate-100 rounded-lg transition"
+                              title="Edit Product"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDeleteConfirm({
+                                  open: true,
+                                  type: "product",
+                                  id: prod.id,
+                                  title: prod.title,
+                                })
+                              }
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                              title="Delete Product"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1086,7 +1241,7 @@ export default function AdminPage() {
               <div>
                 <h2 className="text-lg font-black text-slate-900">Categories & Subcategories Manager</h2>
                 <p className="text-xs text-slate-500">
-                  Organize store departments, toggle homepage marquee appearance, and add sub-categories.
+                  Organize store departments, multi-level Daraz-style subcategories, and child subcategories.
                 </p>
               </div>
               <button
@@ -1103,63 +1258,238 @@ export default function AdminPage() {
                 className="flex items-center gap-1.5 px-4 py-2 bg-brand-pink hover:bg-brand-pinkHover text-white text-xs font-extrabold rounded-xl shadow-md transition"
               >
                 <Plus className="w-4 h-4" />
-                <span>Add Category</span>
+                <span>Add Primary Category</span>
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               {categories.map((cat) => (
                 <div
                   key={cat.id}
-                  className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between gap-3"
+                  className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
-                      <Image
-                        src={cat.image_url || "/images/banners/hero-banner.png"}
-                        alt={cat.name}
-                        fill
-                        sizes="48px"
-                        className="object-cover"
-                        unoptimized
-                      />
+                  {/* Category Header */}
+                  <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-white shrink-0 border border-slate-200 shadow-sm">
+                        <Image
+                          src={cat.image_url || "/images/banners/hero-banner.png"}
+                          alt={cat.name}
+                          fill
+                          sizes="56px"
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-extrabold text-slate-900">{cat.name}</h4>
+                          {cat.show_on_homepage && (
+                            <span className="text-[9px] bg-brand-softPink text-brand-pink font-bold px-1.5 py-0.5 rounded">
+                              Top Marquee
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 font-mono">/{cat.slug}</p>
+                        <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                          {cat.subcategories?.length || 0} Subcategories &bull; Level 1 Department
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-900">{cat.name}</h4>
-                      <p className="text-[10px] text-slate-400 font-mono">/{cat.slug}</p>
-                      {cat.show_on_homepage && (
-                        <span className="text-[9px] bg-brand-softPink text-brand-pink font-bold px-1.5 py-0.2 rounded mt-0.5 inline-block">
-                          Top Marquee Active
-                        </span>
-                      )}
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingCategory(cat);
+                          setCategoryModalOpen(true);
+                        }}
+                        className="p-1.5 text-slate-600 hover:text-brand-pink rounded-lg hover:bg-slate-200 transition"
+                        title="Edit Department"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDeleteConfirm({
+                            open: true,
+                            type: "category",
+                            id: cat.id,
+                            title: cat.name,
+                          })
+                        }
+                        className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
+                        title="Delete Department"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingCategory(cat);
-                        setCategoryModalOpen(true);
-                      }}
-                      className="p-1.5 text-slate-600 hover:text-brand-pink rounded-lg hover:bg-slate-100"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setDeleteConfirm({
-                          open: true,
-                          type: "category",
-                          id: cat.id,
-                          title: cat.name,
-                        })
-                      }
-                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  {/* Subcategories (Level 2 & Level 3) Tree */}
+                  <div className="p-4 space-y-3 flex-1 bg-white">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        Subcategories & Nested Child Links
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        Text only (No image upload required)
+                      </span>
+                    </div>
+
+                    {(!cat.subcategories || cat.subcategories.length === 0) ? (
+                      <p className="text-xs text-slate-400 italic py-2">
+                        No subcategories added yet. Click below to add one.
+                      </p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {cat.subcategories.map((sub) => (
+                          <div
+                            key={sub.id || sub.slug}
+                            className="bg-slate-50 rounded-xl p-3 border border-slate-200/80 space-y-2"
+                          >
+                            {/* Level 2 Subcategory Header */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="w-2 h-2 rounded-full bg-brand-pink shrink-0" />
+                                <span className="font-bold text-xs text-slate-800 truncate">{sub.name}</span>
+                                <span className="text-[10px] text-slate-400 font-mono">({sub.slug})</span>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (addingChildFor?.catSlug === cat.slug && addingChildFor?.subSlug === sub.slug) {
+                                      setAddingChildFor(null);
+                                    } else {
+                                      setAddingChildFor({ catSlug: cat.slug, subSlug: sub.slug });
+                                      setNewChildName("");
+                                    }
+                                  }}
+                                  className="text-[10px] font-bold text-brand-pink hover:text-brand-pinkHover bg-brand-softPink px-2 py-0.5 rounded-lg flex items-center gap-1 transition"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  <span>Child</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteSubcategory(cat.slug, sub.slug)}
+                                  className="p-1 text-slate-400 hover:text-rose-600 rounded transition"
+                                  title="Delete subcategory"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Level 3 Child Subcategories Pills */}
+                            <div className="pl-3.5 border-l-2 border-brand-pink/20 space-y-1.5">
+                              {sub.child_subcategories && sub.child_subcategories.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {sub.child_subcategories.map((child) => (
+                                    <span
+                                      key={child.id || child.slug}
+                                      className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[10px] font-semibold shadow-xs"
+                                    >
+                                      <span>{child.name}</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Inline Add Child Subcategory Form */}
+                              {addingChildFor?.catSlug === cat.slug && addingChildFor?.subSlug === sub.slug && (
+                                <div className="flex items-center gap-1.5 pt-1">
+                                  <input
+                                    type="text"
+                                    value={newChildName}
+                                    onChange={(e) => setNewChildName(e.target.value)}
+                                    placeholder="Nested Child Name (e.g. 2-Piece Sets)"
+                                    className="text-xs bg-white border border-brand-pink/50 rounded-lg px-2.5 py-1 text-slate-800 flex-1 focus:outline-hidden focus:ring-1 focus:ring-brand-pink"
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        handleAddChildSubcategory(cat.slug, sub.slug);
+                                      }
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddChildSubcategory(cat.slug, sub.slug)}
+                                    className="bg-brand-pink text-white text-[11px] font-bold px-2.5 py-1 rounded-lg hover:bg-brand-pinkHover"
+                                  >
+                                    Add
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setAddingChildFor(null)}
+                                    className="text-slate-400 hover:text-slate-600 text-[11px] px-1"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Inline Add Subcategory (Level 2) Form */}
+                    {addingSubcatFor === cat.slug ? (
+                      <div className="p-3 bg-brand-softPink/40 rounded-xl border border-brand-pink/30 space-y-2 mt-2">
+                        <p className="text-[11px] font-bold text-brand-pink">
+                          Add Subcategory to {cat.name} (Level 2)
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={newSubcatName}
+                            onChange={(e) => setNewSubcatName(e.target.value)}
+                            placeholder="e.g. Bridal Nighty Gowns"
+                            className="text-xs bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-slate-800 flex-1 focus:outline-hidden focus:ring-2 focus:ring-brand-pink"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleAddSubcategory(cat.slug);
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleAddSubcategory(cat.slug)}
+                            className="bg-brand-pink hover:bg-brand-pinkHover text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAddingSubcatFor(null);
+                              setNewSubcatName("");
+                            }}
+                            className="text-slate-500 hover:text-slate-700 text-xs px-2"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddingSubcatFor(cat.slug);
+                          setNewSubcatName("");
+                        }}
+                        className="w-full mt-2 py-2 border-2 border-dashed border-slate-200 hover:border-brand-pink text-slate-500 hover:text-brand-pink rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition bg-slate-50/50 hover:bg-brand-softPink/20"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Subcategory to {cat.name}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -2357,144 +2687,425 @@ export default function AdminPage() {
       =========================================== */}
       {productModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4">
-            <h3 className="text-base font-black text-slate-900">
-              {editingProduct?.id ? "Edit Product" : "Add New Product"}
-            </h3>
-
-            <form onSubmit={handleSaveProduct} className="space-y-3 text-xs">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl max-h-[92vh] overflow-y-auto space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Product Title *</label>
-                <input
-                  type="text"
-                  required
-                  value={editingProduct?.title || ""}
-                  onChange={(e) => setEditingProduct((p) => ({ ...(p || {}), title: e.target.value }))}
-                  placeholder="e.g. Premium Bridal Silk Nighty Gown Set"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
-                />
+                <h3 className="text-base font-black text-slate-900">
+                  {editingProduct?.id ? "Edit Product & Inventory" : "Add New Product to Abrish Mart"}
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Fill item details, multi-level category taxonomy, cost vs selling prices, variations, and image gallery.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProductModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProduct} className="space-y-4 text-xs">
+              {/* Product Title & SKU */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block font-bold text-slate-700 mb-1">Product Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingProduct?.title || ""}
+                    onChange={(e) => setEditingProduct((p) => ({ ...(p || {}), title: e.target.value }))}
+                    placeholder="e.g. Premium Bridal Silk Nighty Gown Set"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-brand-pink"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">SKU / Item Code</label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={editingProduct?.sku || ""}
+                      onChange={(e) => setEditingProduct((p) => ({ ...(p || {}), sku: e.target.value }))}
+                      placeholder="e.g. ABM-1029"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-mono text-[11px] focus:outline-hidden focus:ring-2 focus:ring-brand-pink"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditingProduct((p) => ({
+                          ...(p || {}),
+                          sku: `ABM-${Math.floor(1000 + Math.random() * 9000)}`,
+                        }))
+                      }
+                      className="px-2 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-[10px] shrink-0"
+                      title="Generate SKU"
+                    >
+                      Gen
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Multi-Level Taxonomy Selection: Category -> Subcategory -> Child */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-brand-pink" />
+                  <span className="font-bold text-slate-800 text-xs">Category Taxonomy & Classification</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-600 text-[11px] mb-1">
+                      1. Main Department *
+                    </label>
+                    <select
+                      value={editingProduct?.category_slug || categories[0]?.slug}
+                      onChange={(e) => {
+                        const newCatSlug = e.target.value;
+                        const targetCat = categories.find((c) => c.slug === newCatSlug);
+                        setEditingProduct((p) => ({
+                          ...(p || {}),
+                          category_slug: newCatSlug,
+                          subcategory_slug: targetCat?.subcategories?.[0]?.slug || "",
+                          child_subcategory_slug: targetCat?.subcategories?.[0]?.child_subcategories?.[0]?.slug || "",
+                        }));
+                      }}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-brand-pink"
+                    >
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.slug}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-600 text-[11px] mb-1">
+                      2. Subcategory (Level 2)
+                    </label>
+                    {(() => {
+                      const selectedCat = categories.find(
+                        (c) => c.slug === (editingProduct?.category_slug || categories[0]?.slug)
+                      );
+                      const subcats = selectedCat?.subcategories || [];
+
+                      return (
+                        <select
+                          value={editingProduct?.subcategory_slug || ""}
+                          onChange={(e) => {
+                            const newSubSlug = e.target.value;
+                            const targetSub = subcats.find((s) => s.slug === newSubSlug);
+                            setEditingProduct((p) => ({
+                              ...(p || {}),
+                              subcategory_slug: newSubSlug,
+                              child_subcategory_slug: targetSub?.child_subcategories?.[0]?.slug || "",
+                            }));
+                          }}
+                          className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-brand-pink"
+                        >
+                          <option value="">-- Select Subcategory --</option>
+                          {subcats.map((s) => (
+                            <option key={s.id || s.slug} value={s.slug}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-600 text-[11px] mb-1">
+                      3. Child Subcategory (Level 3)
+                    </label>
+                    {(() => {
+                      const selectedCat = categories.find(
+                        (c) => c.slug === (editingProduct?.category_slug || categories[0]?.slug)
+                      );
+                      const selectedSub = selectedCat?.subcategories?.find(
+                        (s) => s.slug === editingProduct?.subcategory_slug
+                      );
+                      const children = selectedSub?.child_subcategories || [];
+
+                      return (
+                        <select
+                          value={editingProduct?.child_subcategory_slug || ""}
+                          onChange={(e) =>
+                            setEditingProduct((p) => ({
+                              ...(p || {}),
+                              child_subcategory_slug: e.target.value,
+                            }))
+                          }
+                          className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-brand-pink"
+                        >
+                          <option value="">-- None / Root Subcategory --</option>
+                          {children.map((ch) => (
+                            <option key={ch.id || ch.slug} value={ch.slug}>
+                              {ch.name}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Pricing & Stock Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Sale Price (PKR) *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Wholesale Cost (PKR)</label>
+                  <input
+                    type="number"
+                    value={editingProduct?.wholesale_price || ""}
+                    onChange={(e) =>
+                      setEditingProduct((p) => ({
+                        ...(p || {}),
+                        wholesale_price: Number(e.target.value),
+                      }))
+                    }
+                    placeholder="e.g. 1500"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Sale Price (PKR) *</label>
                   <input
                     type="number"
                     required
                     value={editingProduct?.price || ""}
-                    onChange={(e) => setEditingProduct((p) => ({ ...(p || {}), price: Number(e.target.value) }))}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
+                    onChange={(e) =>
+                      setEditingProduct((p) => ({
+                        ...(p || {}),
+                        price: Number(e.target.value),
+                      }))
+                    }
+                    placeholder="e.g. 2450"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-bold text-brand-pink"
                   />
                 </div>
+
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Original Price (PKR)</label>
+                  <label className="block font-bold text-slate-700 mb-1">Cut/Original Price</label>
                   <input
                     type="number"
                     value={editingProduct?.original_price || ""}
                     onChange={(e) =>
-                      setEditingProduct((p) => ({ ...(p || {}), original_price: Number(e.target.value) }))
+                      setEditingProduct((p) => ({
+                        ...(p || {}),
+                        original_price: Number(e.target.value),
+                      }))
                     }
+                    placeholder="e.g. 3550"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Category</label>
-                  <select
-                    value={editingProduct?.category_slug || categories[0]?.slug}
-                    onChange={(e) =>
-                      setEditingProduct((p) => ({ ...(p || {}), category_slug: e.target.value }))
-                    }
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
-                  >
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.slug}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Stock Quantity</label>
+                  <label className="block font-bold text-slate-700 mb-1">Stock Quantity</label>
                   <input
                     type="number"
                     value={editingProduct?.stock ?? 15}
-                    onChange={(e) => setEditingProduct((p) => ({ ...(p || {}), stock: Number(e.target.value) }))}
+                    onChange={(e) =>
+                      setEditingProduct((p) => ({
+                        ...(p || {}),
+                        stock: Number(e.target.value),
+                      }))
+                    }
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
                   />
                 </div>
               </div>
 
-              {/* Direct Image Upload with auto-WebP compression */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Upload Product Image (Direct WebP Compressed Upload)
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleImageUpload(e, false)}
-                  className="w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-pink file:text-white"
-                />
-                {uploadingImage && <p className="text-[11px] text-brand-pink mt-1">Compressing to WebP & uploading...</p>}
-                {editingProduct?.thumbnail_url && (
-                  <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 mt-2">
-                    <Image
-                      src={editingProduct.thumbnail_url}
-                      alt="Thumbnail preview"
-                      fill
-                      sizes="64px"
-                      className="object-cover"
-                      unoptimized
+              {/* Profit Margin Preview Bar */}
+              {editingProduct?.price && editingProduct?.wholesale_price && (
+                <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-800">
+                  <span className="font-bold">Calculated Profit per Sale:</span>
+                  <span className="font-black">
+                    Rs. {(Number(editingProduct.price) - Number(editingProduct.wholesale_price)).toLocaleString()} (
+                    {Math.round(
+                      ((Number(editingProduct.price) - Number(editingProduct.wholesale_price)) /
+                        Number(editingProduct.wholesale_price)) *
+                        100
+                    )}
+                    % Markup)
+                  </span>
+                </div>
+              )}
+
+              {/* Image & Gallery Management (WebP compressed upload) */}
+              <div className="space-y-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-slate-800 text-xs">Product Images & Gallery</span>
+                    <p className="text-[10px] text-slate-400">
+                      Upload single cover or multiple gallery photos. Compressed automatically to WebP in browser.
+                    </p>
+                  </div>
+                  {(uploadingImage || galleryUploading) && (
+                    <span className="text-[11px] font-bold text-brand-pink animate-pulse">
+                      Processing & Compressing...
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-600 text-[11px] mb-1">
+                      Cover Thumbnail Upload
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleImageUpload(e, false)}
+                      className="w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-pink file:text-white cursor-pointer"
                     />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-600 text-[11px] mb-1">
+                      + Add Multiple Gallery Photos
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleGalleryUpload}
+                      className="w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-white cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                {/* Gallery Previews with Delete Button */}
+                {editingProduct?.gallery_urls && editingProduct.gallery_urls.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Current Gallery Photos ({editingProduct.gallery_urls.length})
+                    </p>
+                    <div className="flex flex-wrap gap-2.5">
+                      {editingProduct.gallery_urls.map((imgUrl, idx) => (
+                        <div
+                          key={idx}
+                          className="group relative w-16 h-16 rounded-xl overflow-hidden border-2 border-slate-200 bg-white shadow-xs"
+                        >
+                          <Image
+                            src={imgUrl}
+                            alt={`Gallery image ${idx + 1}`}
+                            fill
+                            sizes="64px"
+                            className="object-cover"
+                            unoptimized
+                          />
+                          {idx === 0 && (
+                            <span className="absolute bottom-0 inset-x-0 bg-brand-pink text-white text-[8px] font-bold text-center py-0.5">
+                              Cover
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveGalleryImage(idx)}
+                            className="absolute top-1 right-1 bg-rose-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition shadow"
+                            title="Remove image"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
 
+              {/* Variations (Sizes & Colors) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Available Sizes (Comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={sizesInput}
+                    onChange={(e) => setSizesInput(e.target.value)}
+                    placeholder="e.g. Small, Medium, Large, XL, Free Size"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">Leave blank if single size.</p>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Available Colors (Comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={colorsInput}
+                    onChange={(e) => setColorsInput(e.target.value)}
+                    placeholder="e.g. Maroon, Blush Pink, Black, Navy"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">Leave blank if no color choices.</p>
+                </div>
+              </div>
+
+              {/* Detailed Description */}
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Detailed Description</label>
+                <label className="block font-bold text-slate-700 mb-1">Detailed Description</label>
                 <textarea
                   rows={3}
                   value={editingProduct?.description || ""}
                   onChange={(e) => setEditingProduct((p) => ({ ...(p || {}), description: e.target.value }))}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 resize-none"
+                  placeholder="Enter detailed fabric, dimensions, specifications, or usage guidelines..."
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 resize-none focus:outline-hidden focus:ring-2 focus:ring-brand-pink"
                 />
               </div>
 
-              <div className="flex items-center gap-4 pt-1">
-                <label className="flex items-center gap-1.5 cursor-pointer">
+              {/* Status and Merchandising Toggles */}
+              <div className="flex flex-wrap items-center gap-5 pt-1">
+                <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-700">
                   <input
                     type="checkbox"
                     checked={editingProduct?.is_active ?? true}
                     onChange={(e) => setEditingProduct((p) => ({ ...(p || {}), is_active: e.target.checked }))}
-                    className="rounded text-brand-pink"
+                    className="rounded text-brand-pink focus:ring-brand-pink"
                   />
                   <span>Active on Store</span>
                 </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
+
+                <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-700">
                   <input
                     type="checkbox"
                     checked={editingProduct?.is_flash_deal ?? false}
                     onChange={(e) => setEditingProduct((p) => ({ ...(p || {}), is_flash_deal: e.target.checked }))}
-                    className="rounded text-brand-pink"
+                    className="rounded text-brand-pink focus:ring-brand-pink"
                   />
-                  <span>Flash Deal</span>
+                  <span>⚡ 24H Flash Deal</span>
+                </label>
+
+                <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={editingProduct?.is_featured ?? false}
+                    onChange={(e) => setEditingProduct((p) => ({ ...(p || {}), is_featured: e.target.checked }))}
+                    className="rounded text-brand-pink focus:ring-brand-pink"
+                  />
+                  <span>🌟 Featured on Homepage</span>
                 </label>
               </div>
 
+              {/* Form Buttons */}
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setProductModalOpen(false)}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl"
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-brand-pink hover:bg-brand-pinkHover text-white font-bold rounded-xl shadow"
+                  className="px-6 py-2 bg-brand-pink hover:bg-brand-pinkHover text-white font-black rounded-xl shadow-md shadow-brand-pink/20 transition"
                 >
                   Save Product
                 </button>

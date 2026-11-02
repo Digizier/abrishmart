@@ -24,7 +24,7 @@ export default function CategoryClientView({ slug }: { slug: string }) {
       setLoading(true);
       const [cats, prodRes] = await Promise.all([
         getCategories(),
-        getProducts({ category: slug, page: currentPage, limit: pageSize }),
+        getProducts({ category: slug, offset: (currentPage - 1) * pageSize, limit: pageSize }),
       ]);
 
       const found = cats.find((c) => c.slug === slug);

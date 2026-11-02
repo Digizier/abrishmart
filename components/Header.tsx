@@ -3,9 +3,22 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, ShoppingBag, Phone, Menu, X, ChevronDown, PackageCheck } from "lucide-react";
-import { Product } from "@/lib/types";
-import { getProducts } from "@/lib/db";
+import {
+  Search,
+  ShoppingBag,
+  Phone,
+  Menu,
+  X,
+  ChevronDown,
+  ChevronRight,
+  PackageCheck,
+  Flame,
+  Layers,
+  ArrowRight,
+  Sparkles,
+} from "lucide-react";
+import { Product, Category, Subcategory } from "@/lib/types";
+import { getProducts, getCategories } from "@/lib/db";
 
 interface HeaderProps {
   onOpenCart?: () => void;
@@ -19,6 +32,39 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Dynamic Categories from Database / Admin
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [megaMenuOpen, setMegaMenuOpen] = useState(false);
+  const [activeHoverCategory, setActiveHoverCategory] = useState<Category | null>(null);
+  const megaMenuRef = useRef<HTMLDivElement>(null);
+
+  // Mobile Accordion state for categories
+  const [mobileExpandedCat, setMobileExpandedCat] = useState<string | null>(null);
+  const [mobileExpandedSub, setMobileExpandedSub] = useState<string | null>(null);
+
+  // Load and sync categories
+  const loadHeaderCategories = async () => {
+    try {
+      const cats = await getCategories();
+      setCategories(cats);
+      if (cats.length > 0 && !activeHoverCategory) {
+        setActiveHoverCategory(cats[0]);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadHeaderCategories();
+
+    // Listen for admin category updates live
+    const handleUpdate = () => {
+      loadHeaderCategories();
+    };
+
+    window.addEventListener("kb_categories_updated", handleUpdate);
+    return () => window.removeEventListener("kb_categories_updated", handleUpdate);
+  }, []);
 
   // Debounced search logic for Pakistani/Hinglish search
   useEffect(() => {
@@ -39,11 +85,14 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Click outside listener for search dropdown
+  // Click outside listener for search & mega-menu
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setShowSearchDropdown(false);
+      }
+      if (megaMenuRef.current && !megaMenuRef.current.contains(e.target as Node)) {
+        setMegaMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -51,8 +100,9 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 transition-all">
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 transition-all shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        {/* Top Header Row */}
         <div className="flex items-center justify-between h-16 sm:h-20 gap-3">
           {/* Mobile menu toggle */}
           <button
@@ -121,7 +171,9 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
                             {item.title}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs font-bold text-brand-pink">Rs. {item.price.toLocaleString()}</span>
+                            <span className="text-xs font-bold text-brand-pink">
+                              Rs. {item.price.toLocaleString()}
+                            </span>
                             {item.original_price && item.original_price > item.price && (
                               <span className="text-[10px] text-slate-400 line-through">
                                 Rs. {item.original_price.toLocaleString()}
@@ -149,7 +201,7 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
           </div>
 
           {/* Right Action Buttons */}
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Track Order Shortcut */}
             <Link
               href="/track-order"
@@ -202,85 +254,315 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
           </div>
         </div>
 
-        {/* Desktop Navigation Links */}
-        <nav className="hidden md:flex items-center gap-8 border-t border-slate-100 py-2.5 text-xs font-semibold text-slate-700">
-          <Link href="/" className="hover:text-brand-pink transition">
-            Home
-          </Link>
-          <Link href="/shop" className="hover:text-brand-pink transition">
-            All Products
-          </Link>
-          <Link href="/category/bridal-silk-nightwear" className="hover:text-brand-pink transition flex items-center gap-1">
-            <span>Bridal Silk & Nightwear</span>
-            <span className="bg-brand-pink text-white text-[9px] px-1.5 py-0.2 rounded font-bold uppercase">Hot</span>
-          </Link>
-          <Link href="/category/kids-educational-toys" className="hover:text-brand-pink transition">
-            Kids & Toys
-          </Link>
-          <Link href="/category/fashion-watches" className="hover:text-brand-pink transition">
-            Fashion & Watches
-          </Link>
-          <Link href="/category/smart-gadgets-audio" className="hover:text-brand-pink transition">
-            Smart Gadgets
-          </Link>
-          <Link href="/track-order" className="hover:text-brand-pink transition ml-auto text-emerald-700 font-bold">
-            Order Tracking
-          </Link>
+        {/* =========================================================
+            DESKTOP NAVIGATION ROW WITH DARAZ-STYLE MEGA MENU & FLASH SALE
+        ========================================================= */}
+        <nav className="hidden md:flex items-center justify-between border-t border-slate-100 py-2 text-xs font-semibold text-slate-700 relative">
+          <div className="flex items-center gap-6">
+            {/* 1. All Categories Dropdown Button (Daraz Mega-Menu Trigger) */}
+            <div ref={megaMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setMegaMenuOpen(!megaMenuOpen)}
+                onMouseEnter={() => setMegaMenuOpen(true)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl font-bold transition ${
+                  megaMenuOpen
+                    ? "bg-brand-pink text-white shadow-md shadow-brand-pink/20"
+                    : "bg-slate-100 hover:bg-brand-softPink hover:text-brand-pink text-slate-900"
+                }`}
+              >
+                <Layers className="w-4 h-4" />
+                <span>Categories</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${megaMenuOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {/* Mega-Menu Flyout (Daraz Multi-level Structure) */}
+              {megaMenuOpen && (
+                <div
+                  onMouseLeave={() => setMegaMenuOpen(false)}
+                  className="absolute top-full left-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50 flex w-[780px] min-h-[360px] animate-in fade-in slide-in-from-top-1 duration-150"
+                >
+                  {/* Left Column: Primary Categories */}
+                  <div className="w-64 bg-slate-50 border-r border-slate-200/80 p-2 space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase px-2.5 py-1 block">
+                      Main Departments
+                    </span>
+                    {categories.map((cat) => {
+                      const isActive =
+                        (activeHoverCategory?.slug || categories[0]?.slug) === cat.slug;
+                      return (
+                        <div
+                          key={cat.id}
+                          onMouseEnter={() => setActiveHoverCategory(cat)}
+                          className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition ${
+                            isActive
+                              ? "bg-white text-brand-pink shadow-xs font-bold border border-slate-200/80"
+                              : "text-slate-700 hover:bg-white/80 hover:text-slate-900"
+                          }`}
+                        >
+                          <Link
+                            href={`/category/${cat.slug}`}
+                            onClick={() => setMegaMenuOpen(false)}
+                            className="flex items-center gap-2.5 truncate flex-1"
+                          >
+                            <span className="w-2 h-2 rounded-full bg-brand-pink"></span>
+                            <span className="truncate">{cat.name}</span>
+                          </Link>
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Right Column: Subcategories & Child Categories (Multi-level) */}
+                  <div className="flex-1 p-6 bg-white overflow-y-auto max-h-[460px]">
+                    {activeHoverCategory ? (
+                      <div className="space-y-6">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                          <div>
+                            <h3 className="text-sm font-black text-slate-900">
+                              {activeHoverCategory.name}
+                            </h3>
+                            <p className="text-[11px] text-slate-400">
+                              Explore subcategories and specialized collections
+                            </p>
+                          </div>
+                          <Link
+                            href={`/category/${activeHoverCategory.slug}`}
+                            onClick={() => setMegaMenuOpen(false)}
+                            className="text-xs font-bold text-brand-pink hover:underline flex items-center gap-1"
+                          >
+                            <span>View All Products</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
+
+                        {/* Subcategories Grid */}
+                        {activeHoverCategory.subcategories &&
+                        activeHoverCategory.subcategories.length > 0 ? (
+                          <div className="grid grid-cols-2 gap-6">
+                            {activeHoverCategory.subcategories.map((sub) => (
+                              <div key={sub.id} className="space-y-2">
+                                <Link
+                                  href={`/category/${activeHoverCategory.slug}?sub=${sub.slug}`}
+                                  onClick={() => setMegaMenuOpen(false)}
+                                  className="font-bold text-xs text-slate-900 hover:text-brand-pink block pb-1 border-b border-slate-100"
+                                >
+                                  {sub.name}
+                                </Link>
+
+                                {/* Level 3: Child Subcategories */}
+                                {sub.child_subcategories && sub.child_subcategories.length > 0 && (
+                                  <div className="space-y-1 pl-2">
+                                    {sub.child_subcategories.map((child) => (
+                                      <Link
+                                        key={child.id}
+                                        href={`/category/${activeHoverCategory.slug}?sub=${sub.slug}&child=${child.slug}`}
+                                        onClick={() => setMegaMenuOpen(false)}
+                                        className="text-[11px] text-slate-500 hover:text-brand-pink block py-0.5 hover:translate-x-1 transition-transform"
+                                      >
+                                        • {child.name}
+                                      </Link>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="py-8 text-center text-slate-400 text-xs">
+                            <p>Browse full catalog in {activeHoverCategory.name}</p>
+                            <Link
+                              href={`/category/${activeHoverCategory.slug}`}
+                              onClick={() => setMegaMenuOpen(false)}
+                              className="inline-block mt-3 px-4 py-2 bg-brand-softPink text-brand-pink font-bold rounded-xl text-xs"
+                            >
+                              Open Department Catalog
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-slate-400 text-xs">Select a department</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Direct Primary Category Links (Synced with Admin Categories) */}
+            <Link href="/" className="hover:text-brand-pink transition font-bold text-slate-900">
+              Home
+            </Link>
+            <Link href="/shop" className="hover:text-brand-pink transition">
+              All Products
+            </Link>
+
+            {categories.slice(0, 4).map((cat) => (
+              <Link
+                key={cat.id}
+                href={`/category/${cat.slug}`}
+                className="hover:text-brand-pink transition truncate max-w-[150px]"
+              >
+                {cat.name}
+              </Link>
+            ))}
+          </div>
+
+          {/* Right Action: FLASH SALE Active Highlighted Button */}
+          <div className="flex items-center gap-4">
+            <Link
+              href="/flash-deals"
+              className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-rose-600 via-brand-pink to-amber-500 text-white rounded-full font-black text-xs shadow-md shadow-brand-pink/20 hover:scale-105 transition group"
+            >
+              <Flame className="w-3.5 h-3.5 animate-pulse text-yellow-300" />
+              <span>FLASH SALE</span>
+              <span className="bg-white text-rose-600 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">
+                Hot
+              </span>
+            </Link>
+
+            <Link href="/track-order" className="hover:text-brand-pink transition text-emerald-700 font-bold">
+              Track Order
+            </Link>
+          </div>
         </nav>
       </div>
 
-      {/* Mobile Menu Drawer */}
+      {/* =========================================================
+          MOBILE MENU DRAWER WITH ACCORDION SUB-CATEGORIES
+      ========================================================= */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-b border-slate-200 px-4 py-4 space-y-3 shadow-lg animate-in fade-in duration-150">
+        <div className="md:hidden bg-white border-b border-slate-200 px-4 py-4 space-y-3 shadow-lg animate-in fade-in duration-150 max-h-[80vh] overflow-y-auto">
+          {/* Flash Sale Banner on Mobile */}
+          <Link
+            href="/flash-deals"
+            onClick={() => setMobileMenuOpen(false)}
+            className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-rose-600 via-brand-pink to-amber-500 text-white font-extrabold text-xs shadow-md"
+          >
+            <div className="flex items-center gap-2">
+              <Flame className="w-4 h-4 text-yellow-300 animate-pulse" />
+              <span>FLASH SALE (Up to 40% OFF)</span>
+            </div>
+            <span className="text-[10px] bg-white text-rose-600 px-2 py-0.5 rounded-full font-black">
+              EXPLORE
+            </span>
+          </Link>
+
           <Link
             href="/"
             onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm font-semibold text-slate-800 hover:text-brand-pink py-1.5 border-b border-slate-100"
+            className="block text-xs font-bold text-slate-800 hover:text-brand-pink py-1.5 border-b border-slate-100"
           >
             Home
           </Link>
           <Link
             href="/shop"
             onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm font-semibold text-slate-800 hover:text-brand-pink py-1.5 border-b border-slate-100"
+            className="block text-xs font-bold text-slate-800 hover:text-brand-pink py-1.5 border-b border-slate-100"
           >
             All Products Catalog
           </Link>
-          <Link
-            href="/category/bridal-silk-nightwear"
-            onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center justify-between text-sm font-semibold text-slate-800 hover:text-brand-pink py-1.5 border-b border-slate-100"
-          >
-            <span>Bridal Silk & Nightwear</span>
-            <span className="bg-brand-pink text-white text-[10px] px-2 py-0.5 rounded font-bold">Hot</span>
-          </Link>
-          <Link
-            href="/category/kids-educational-toys"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm font-semibold text-slate-800 hover:text-brand-pink py-1.5 border-b border-slate-100"
-          >
-            Kids & Toys
-          </Link>
-          <Link
-            href="/category/fashion-watches"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm font-semibold text-slate-800 hover:text-brand-pink py-1.5 border-b border-slate-100"
-          >
-            Fashion & Watches
-          </Link>
-          <Link
-            href="/category/smart-gadgets-audio"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm font-semibold text-slate-800 hover:text-brand-pink py-1.5 border-b border-slate-100"
-          >
-            Smart Gadgets & Audio
-          </Link>
+
+          {/* Dynamic Accordion Categories */}
+          <div className="pt-2">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-2">
+              Departments & Subcategories
+            </span>
+
+            <div className="space-y-1.5">
+              {categories.map((cat) => {
+                const isExpanded = mobileExpandedCat === cat.slug;
+                const hasSubs = cat.subcategories && cat.subcategories.length > 0;
+
+                return (
+                  <div key={cat.id} className="border border-slate-100 rounded-xl overflow-hidden bg-slate-50/50">
+                    <div className="flex items-center justify-between p-2.5">
+                      <Link
+                        href={`/category/${cat.slug}`}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="font-bold text-xs text-slate-900 hover:text-brand-pink flex-1"
+                      >
+                        {cat.name}
+                      </Link>
+
+                      {hasSubs && (
+                        <button
+                          type="button"
+                          onClick={() => setMobileExpandedCat(isExpanded ? null : cat.slug)}
+                          className="p-1 text-slate-400 hover:text-slate-700"
+                        >
+                          <ChevronDown
+                            className={`w-4 h-4 transition-transform ${isExpanded ? "rotate-180 text-brand-pink" : ""}`}
+                          />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Subcategories Level 2 */}
+                    {isExpanded && hasSubs && (
+                      <div className="bg-white p-3 border-t border-slate-100 space-y-2">
+                        {cat.subcategories!.map((sub) => {
+                          const isSubExpanded = mobileExpandedSub === sub.slug;
+                          const hasChildren = sub.child_subcategories && sub.child_subcategories.length > 0;
+
+                          return (
+                            <div key={sub.id} className="pl-2 border-l-2 border-brand-softPink">
+                              <div className="flex items-center justify-between">
+                                <Link
+                                  href={`/category/${cat.slug}?sub=${sub.slug}`}
+                                  onClick={() => setMobileMenuOpen(false)}
+                                  className="text-xs font-semibold text-slate-800 hover:text-brand-pink"
+                                >
+                                  {sub.name}
+                                </Link>
+                                {hasChildren && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setMobileExpandedSub(isSubExpanded ? null : sub.slug)
+                                    }
+                                    className="p-1 text-slate-400"
+                                  >
+                                    <ChevronRight
+                                      className={`w-3.5 h-3.5 transition-transform ${isSubExpanded ? "rotate-90 text-brand-pink" : ""}`}
+                                    />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Level 3 Children */}
+                              {isSubExpanded && hasChildren && (
+                                <div className="mt-1 space-y-1 pl-3">
+                                  {sub.child_subcategories!.map((ch) => (
+                                    <Link
+                                      key={ch.id}
+                                      href={`/category/${cat.slug}?sub=${sub.slug}&child=${ch.slug}`}
+                                      onClick={() => setMobileMenuOpen(false)}
+                                      className="block text-[11px] text-slate-500 hover:text-brand-pink py-0.5"
+                                    >
+                                      • {ch.name}
+                                    </Link>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <Link
             href="/track-order"
             onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm font-bold text-emerald-700 py-1.5"
+            className="block text-xs font-bold text-emerald-700 py-2 border-t border-slate-100"
           >
-            Track Your Order
+            Track Your Order (COD Status)
           </Link>
         </div>
       )}

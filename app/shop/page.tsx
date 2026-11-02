@@ -41,7 +41,7 @@ export default function ShopPage() {
       const res = await getProducts({
         category: selectedCategory || undefined,
         search: searchQuery || undefined,
-        page: currentPage,
+        offset: (currentPage - 1) * pageSize,
         limit: pageSize,
       });
 

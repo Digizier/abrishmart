@@ -84,7 +84,7 @@ export default function ProductDetailClientView({ slug }: { slug: string }) {
       ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
       : null;
 
-  const imagesList = [product.thumbnail_url, ...(product.gallery_urls || [])].filter(Boolean);
+  const imagesList = Array.from(new Set([product.thumbnail_url, ...(product.gallery_urls || [])].filter(Boolean)));
 
   const productUrl = typeof window !== "undefined" ? window.location.href : `https://abrishmart.store/product/${product.slug}`;
   const whatsappShareText = encodeURIComponent(

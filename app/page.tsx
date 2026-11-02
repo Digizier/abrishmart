@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Zap, Flame, ArrowRight, ShieldCheck, Sparkles } from "lucide-react";
+import { Flame, ArrowRight, Sparkles } from "lucide-react";
 import { Product, Category, Banner } from "@/lib/types";
 import { getProducts, getCategories, getBanners } from "@/lib/db";
 import { useCart } from "@/context/CartContext";
@@ -27,18 +27,29 @@ export default function HomePage() {
       const [fetchedBanners, fetchedCategories, dealsRes, featuredRes] = await Promise.all([
         getBanners(),
         getCategories(),
-        getProducts({ flashDeals: true, limit: 4 }),
-        getProducts({ limit: 8 }),
+        getProducts({ flashDeals: true, limit: 4 }), // Strictly top 4 flash deals
+        getProducts({ limit: 8 }), // Strictly 8 products on homepage
       ]);
 
       setBanners(fetchedBanners);
       setCategories(fetchedCategories);
-      setFlashDeals(dealsRes.products);
-      setFeaturedProducts(featuredRes.products);
+      setFlashDeals(dealsRes.products.slice(0, 4));
+      setFeaturedProducts(featuredRes.products.slice(0, 8));
       setLoading(false);
     }
 
     loadHomeData();
+
+    // Listen for product or category updates from admin live
+    const handleUpdate = () => {
+      loadHomeData();
+    };
+    window.addEventListener("kb_products_updated", handleUpdate);
+    window.addEventListener("kb_categories_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("kb_products_updated", handleUpdate);
+      window.removeEventListener("kb_categories_updated", handleUpdate);
+    };
   }, []);
 
   return (
@@ -49,31 +60,31 @@ export default function HomePage() {
       {/* 2. Top Categories Continuous Marquee */}
       <TopCategoriesMarquee categories={categories} />
 
-      {/* 3. Flash Deals (2-Column Mobile Grid) */}
+      {/* 3. Flash Deals (Strictly Top 4 Products on Homepage) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="bg-gradient-to-r from-brand-pink/10 via-rose-50 to-amber-50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-brand-pink/20">
+        <div className="bg-gradient-to-r from-brand-pink/10 via-rose-50 to-amber-50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-brand-pink/20 shadow-xs">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-brand-pink text-white shadow-md">
-                <Flame className="w-5 h-5 animate-pulse" />
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-rose-600 to-brand-pink text-white shadow-md">
+                <Flame className="w-5 h-5 animate-pulse text-yellow-300" />
               </div>
               <div>
                 <span className="text-[10px] font-extrabold uppercase tracking-widest text-brand-pink">
-                  Hot Promotions
+                  Hot 24H Deals
                 </span>
-                <h2 className="text-base sm:text-2xl font-black text-slate-900 flex items-center gap-1.5">
+                <h2 className="text-base sm:text-2xl font-black text-slate-900 flex items-center gap-2">
                   <span>Flash Deals Converter</span>
-                  <span className="text-xs bg-brand-yellow text-slate-900 font-extrabold px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] sm:text-xs bg-brand-yellow text-slate-900 font-extrabold px-2 py-0.5 rounded-full">
                     SAVE UP TO 40%
                   </span>
                 </h2>
               </div>
             </div>
             <Link
-              href="/shop?deals=true"
-              className="text-xs font-bold text-brand-pink hover:text-brand-pinkHover flex items-center gap-1"
+              href="/flash-deals"
+              className="text-xs font-bold text-brand-pink hover:text-brand-pinkHover flex items-center gap-1 bg-white px-3 py-1.5 rounded-xl border border-brand-pink/20 shadow-xs hover:shadow transition"
             >
-              <span>See All</span>
+              <span>See All Flash Deals</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -95,7 +106,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 4. Trending & Featured Products (Strict 2-Column Mobile Grid) */}
+      {/* 4. Trending & Featured Products (Strictly 8 Products on Homepage) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <div>
@@ -111,7 +122,7 @@ export default function HomePage() {
             href="/shop"
             className="text-xs font-bold text-brand-pink hover:text-brand-pinkHover flex items-center gap-1"
           >
-            <span>View All ({featuredProducts.length}+)</span>
+            <span>View All</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -119,16 +130,29 @@ export default function HomePage() {
         {loading ? (
           <ProductGridSkeleton count={8} />
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
-            {featuredProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onQuickOrder={(p) => openQuickCheckout(p)}
-                onAddToCart={(p) => addToCart(p)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
+              {featuredProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onQuickOrder={(p) => openQuickCheckout(p)}
+                  onAddToCart={(p) => addToCart(p)}
+                />
+              ))}
+            </div>
+
+            {/* Bottom Button: Explore All Products */}
+            <div className="pt-8 text-center">
+              <Link
+                href="/shop"
+                className="inline-flex items-center gap-2 px-8 py-3.5 bg-slate-900 hover:bg-brand-pink text-white text-xs sm:text-sm font-black rounded-2xl shadow-lg transition-all transform hover:-translate-y-0.5"
+              >
+                <span>Explore All Products in Pakistan</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </>
         )}
       </section>
 

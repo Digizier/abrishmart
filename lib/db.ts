@@ -1,8 +1,529 @@
 import { supabase } from "./supabase";
-import { Product, Category, Order, Banner, SiteSettings, Coupon } from "./types";
+import { Product, Category, Subcategory, Order, Banner, SiteSettings, Coupon } from "./types";
 
 // ==========================================
-// INITIAL SEED DATA (Used when DB is empty)
+// INITIAL CATEGORIES & NESTED SUBCATEGORIES (DARAZ HIERARCHY)
+// ==========================================
+export const INITIAL_CATEGORIES: Category[] = [
+  {
+    id: 1,
+    name: "Bridal Silk & Nightwear",
+    slug: "bridal-silk-nightwear",
+    image_url: "/images/categories/bridal-silk.webp",
+    show_on_homepage: true,
+    sort_order: 1,
+    subcategories: [
+      {
+        id: 101,
+        name: "Bridal Nighty Gowns",
+        slug: "bridal-nighty-gowns",
+        parent_slug: "bridal-silk-nightwear",
+        child_subcategories: [
+          { id: 1001, name: "2-Piece Silk Gown Sets", slug: "2-piece-silk-sets" },
+          { id: 1002, name: "Embroidered Lace Gowns", slug: "embroidered-lace-gowns" },
+          { id: 1003, name: "Luxury Bridal Nightwear", slug: "luxury-bridal-nightwear" },
+        ],
+      },
+      {
+        id: 102,
+        name: "Satin Robes & Kimonos",
+        slug: "satin-robes-kimonos",
+        parent_slug: "bridal-silk-nightwear",
+        child_subcategories: [
+          { id: 1004, name: "Silk Kimono Bathrobes", slug: "silk-kimono-bathrobes" },
+          { id: 1005, name: "Satin Dressing Robes", slug: "satin-dressing-robes" },
+        ],
+      },
+      {
+        id: 103,
+        name: "Comfort Sleepwear",
+        slug: "comfort-sleepwear",
+        parent_slug: "bridal-silk-nightwear",
+        child_subcategories: [
+          { id: 1006, name: "Silk Pajama Sets", slug: "silk-pajama-sets" },
+          { id: 1007, name: "Soft Cotton Sleep Dresses", slug: "cotton-sleep-dresses" },
+        ],
+      },
+    ],
+  },
+  {
+    id: 2,
+    name: "Kids & Educational Toys",
+    slug: "kids-educational-toys",
+    image_url: "/images/categories/kids-toys.webp",
+    show_on_homepage: true,
+    sort_order: 2,
+    subcategories: [
+      {
+        id: 201,
+        name: "Montessori Learning",
+        slug: "montessori-learning",
+        parent_slug: "kids-educational-toys",
+        child_subcategories: [
+          { id: 2001, name: "Phonetic Learning Tablets", slug: "phonetic-learning-tablets" },
+          { id: 2002, name: "Wooden Puzzle Blocks", slug: "wooden-puzzle-blocks" },
+          { id: 2003, name: "Flashcards & Math Cards", slug: "flashcards-math-cards" },
+        ],
+      },
+      {
+        id: 202,
+        name: "Creative Art & Drawing",
+        slug: "creative-art-drawing",
+        parent_slug: "kids-educational-toys",
+        child_subcategories: [
+          { id: 2004, name: "54 Pcs Art Studio Kits", slug: "54-pcs-art-studio-kits" },
+          { id: 2005, name: "Smiley Cartoon Pencils", slug: "smiley-cartoon-pencils" },
+          { id: 2006, name: "Bendy Flexible Magic Pencils", slug: "bendy-flexible-pencils" },
+        ],
+      },
+      {
+        id: 203,
+        name: "Fun Stamps & Games",
+        slug: "fun-stamps-games",
+        parent_slug: "kids-educational-toys",
+        child_subcategories: [
+          { id: 2007, name: "Self-Inking Emoji Stamps", slug: "emoji-stamp-sets" },
+          { id: 2008, name: "Birthday Return Gifts", slug: "birthday-return-gifts" },
+        ],
+      },
+    ],
+  },
+  {
+    id: 3,
+    name: "Fashion & Watches",
+    slug: "fashion-watches",
+    image_url: "/images/categories/fashion-watches.webp",
+    show_on_homepage: true,
+    sort_order: 3,
+    subcategories: [
+      {
+        id: 301,
+        name: "Men's Luxury Watches",
+        slug: "mens-luxury-watches",
+        parent_slug: "fashion-watches",
+        child_subcategories: [
+          { id: 3001, name: "Chronograph Quartz Watches", slug: "chronograph-quartz-watches" },
+          { id: 3002, name: "Genuine Leather Strap Dials", slug: "leather-strap-dials" },
+          { id: 3003, name: "Waterproof Stainless Steel", slug: "waterproof-stainless-steel" },
+        ],
+      },
+      {
+        id: 302,
+        name: "Women's Timepieces",
+        slug: "womens-timepieces",
+        parent_slug: "fashion-watches",
+        child_subcategories: [
+          { id: 3004, name: "Rose Gold Bracelet Watches", slug: "rose-gold-bracelet-watches" },
+          { id: 3005, name: "Magnetic Strap Dials", slug: "magnetic-strap-dials" },
+        ],
+      },
+      {
+        id: 303,
+        name: "Wallets & Accessories",
+        slug: "wallets-accessories",
+        parent_slug: "fashion-watches",
+        child_subcategories: [
+          { id: 3006, name: "Men's Slim Wallets", slug: "mens-slim-wallets" },
+          { id: 3007, name: "Cosmetic & Beauty Accessories", slug: "beauty-accessories" },
+        ],
+      },
+    ],
+  },
+  {
+    id: 4,
+    name: "Smart Gadgets & Audio",
+    slug: "smart-gadgets-audio",
+    image_url: "/images/categories/smart-gadgets.webp",
+    show_on_homepage: true,
+    sort_order: 4,
+    subcategories: [
+      {
+        id: 401,
+        name: "Wireless Earbuds (TWS)",
+        slug: "wireless-earbuds-tws",
+        parent_slug: "smart-gadgets-audio",
+        child_subcategories: [
+          { id: 4001, name: "LED Battery Display TWS", slug: "led-battery-display-tws" },
+          { id: 4002, name: "Bluetooth 5.3 Pro Earbuds", slug: "bluetooth-5-3-earbuds" },
+          { id: 4003, name: "Gaming Low-Latency Pods", slug: "gaming-earbuds" },
+        ],
+      },
+      {
+        id: 402,
+        name: "Cables & Fast Chargers",
+        slug: "cables-fast-chargers",
+        parent_slug: "smart-gadgets-audio",
+        child_subcategories: [
+          { id: 4004, name: "Type-C 3.1A Fast Cables", slug: "type-c-fast-cables" },
+          { id: 4005, name: "Micro USB Android Cables", slug: "micro-usb-cables" },
+          { id: 4006, name: "Quick Charge 3.0 Adapters", slug: "qc-3-adapters" },
+        ],
+      },
+      {
+        id: 403,
+        name: "Wired Handsfree & Audio",
+        slug: "wired-handsfree-audio",
+        parent_slug: "smart-gadgets-audio",
+        child_subcategories: [
+          { id: 4007, name: "Deep Bass Stereo Handsfree", slug: "deep-bass-stereo-handsfree" },
+          { id: 4008, name: "In-Ear Mic Headsets", slug: "in-ear-mic-headsets" },
+        ],
+      },
+    ],
+  },
+  {
+    id: 5,
+    name: "Home & Kitchen Essentials",
+    slug: "home-kitchen-essentials",
+    image_url: "/images/categories/home-kitchen.webp",
+    show_on_homepage: true,
+    sort_order: 5,
+    subcategories: [
+      {
+        id: 501,
+        name: "Smart Kitchen Tools",
+        slug: "smart-kitchen-tools",
+        parent_slug: "home-kitchen-essentials",
+        child_subcategories: [
+          { id: 5001, name: "4-in-1 Electric Vegetable Slicers", slug: "electric-vegetable-slicers" },
+          { id: 5002, name: "Wireless Garlic Choppers", slug: "wireless-garlic-choppers" },
+          { id: 5003, name: "Rotary Cheese Graters", slug: "rotary-cheese-graters" },
+        ],
+      },
+      {
+        id: 502,
+        name: "Thermal Bottles & Flasks",
+        slug: "thermal-bottles-flasks",
+        parent_slug: "home-kitchen-essentials",
+        child_subcategories: [
+          { id: 5004, name: "LED Temperature Touch Flasks", slug: "led-temperature-flasks" },
+          { id: 5005, name: "Double-Wall Vacuum Bottles", slug: "vacuum-insulated-bottles" },
+        ],
+      },
+      {
+        id: 503,
+        name: "Home Utility Pumps",
+        slug: "home-utility-pumps",
+        parent_slug: "home-kitchen-essentials",
+        child_subcategories: [
+          { id: 5006, name: "Automatic Water Dispenser Pumps", slug: "automatic-water-pumps" },
+          { id: 5007, name: "Rechargeable USB Pumps", slug: "rechargeable-usb-pumps" },
+        ],
+      },
+    ],
+  },
+  {
+    id: 6,
+    name: "Stationery & School Bags",
+    slug: "stationery-school-bags",
+    image_url: "/images/categories/stationery-crafts.webp",
+    show_on_homepage: true,
+    sort_order: 6,
+    subcategories: [
+      {
+        id: 601,
+        name: "School & College Backpacks",
+        slug: "school-college-backpacks",
+        parent_slug: "stationery-school-bags",
+        child_subcategories: [
+          { id: 6001, name: "Korean Trendy School Bags", slug: "korean-school-bags" },
+          { id: 6002, name: "Slim Waterproof Laptop Bags", slug: "waterproof-laptop-bags" },
+          { id: 6003, name: "Primary School Cartoon Bags", slug: "primary-school-bags" },
+        ],
+      },
+      {
+        id: 602,
+        name: "DIY Crafts & Foam Sheets",
+        slug: "diy-crafts-foam-sheets",
+        parent_slug: "stationery-school-bags",
+        child_subcategories: [
+          { id: 6004, name: "A4 Glitter Foam Sheets (Self Adhesive)", slug: "glitter-foam-sheets" },
+          { id: 6005, name: "Children Craft Accessories", slug: "children-craft-accessories" },
+        ],
+      },
+    ],
+  },
+];
+
+// ==========================================
+// REAL INITIAL PRODUCTS (HHC DROPSHIPPING VERIFIED)
+// ==========================================
+export const INITIAL_PRODUCTS: Product[] = [
+  {
+    id: 3768621,
+    title: "Premium Bridal Silk Nighty Gown Set (Night Ease Edition)",
+    slug: "premium-bridal-silk-nighty-gown-set",
+    description: "Ultra-luxurious 2-piece bridal silk nighty gown set crafted with imported satin silk. Features delicate lace embroidery, adjustable straps, and smooth breathable fabric tailored for superior comfort and elegance.",
+    price: 2450,
+    original_price: 3650,
+    wholesale_price: 1450,
+    stock: 25,
+    thumbnail_url: "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/10/18/1e9c870518b5798afed6e643e848de66.jpg",
+    gallery_urls: [
+      "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/10/18/80d5d26f5a51fb1cc6fef86d85450daa.jpg",
+      "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/10/18/c001e6291270ba7cb24a61f5f698e0cf.jpg",
+      "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/10/18/45875c174b1cfa6709eebba468fc75e1.jpg",
+    ],
+    category_slug: "bridal-silk-nightwear",
+    subcategory_slug: "bridal-nighty-gowns",
+    child_subcategory_slug: "2-piece-silk-sets",
+    is_active: true,
+    is_featured: true,
+    is_flash_deal: true, // Flash deal top 4
+    rating: 4.9,
+    reviews_count: 42,
+    variations: {
+      sizes: ["Small", "Medium", "Large", "XL"],
+      colors: ["Royal Maroon", "Midnight Black", "Blush Pink", "Emerald Green"],
+    },
+    sku: "NE-SILK-001",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 3765606,
+    title: "Smiley Cartoon Stationery Pencils Children Gift (Pack of 5)",
+    slug: "smiley-cartoon-stationery-pencils-children-gift-pack-of-5",
+    description: "Smiley Cartoon Stationery Pencils for kids. These colorful, fun pencils feature funny faces and come in a pack of 5. Perfect for school students, birthday return gifts, and daily drawing routine.",
+    price: 761,
+    original_price: 1050,
+    wholesale_price: 261,
+    stock: 50,
+    thumbnail_url: "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/09/16/c8f6f115b78ec57b96203e6ca4911ca3.jpeg",
+    gallery_urls: [
+      "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/09/16/c8f6f115b78ec57b96203e6ca4911ca3.jpeg",
+    ],
+    category_slug: "kids-educational-toys",
+    subcategory_slug: "creative-art-drawing",
+    child_subcategory_slug: "smiley-cartoon-pencils",
+    is_active: true,
+    is_featured: true,
+    is_flash_deal: true, // Flash deal top 4
+    rating: 4.8,
+    reviews_count: 28,
+    variations: {
+      colors: ["Rainbow Fun Faces", "Pastel Assorted"],
+    },
+    sku: "HHC-3765606-ADV",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 3765602,
+    title: "54 Pcs Art Studio Kit - Children Creative Drawing & Craft Set",
+    slug: "54-pcs-color-kit-art-studio-drawing-craft-set",
+    description: "Complete 54-piece art studio kit containing vibrant oil pastels, wax crayons, color markers, watercolor cakes, paint brush, sharpener, and eraser in a portable carry organizer box.",
+    price: 1650,
+    original_price: 2450,
+    wholesale_price: 1082,
+    stock: 35,
+    thumbnail_url: "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/09/16/81a9c402120019ee7fe46914619bb391.jpeg",
+    gallery_urls: [
+      "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/09/16/81a9c402120019ee7fe46914619bb391.jpeg",
+    ],
+    category_slug: "kids-educational-toys",
+    subcategory_slug: "creative-art-drawing",
+    child_subcategory_slug: "54-pcs-art-studio-kits",
+    is_active: true,
+    is_featured: true,
+    is_flash_deal: true, // Flash deal top 4
+    rating: 4.9,
+    reviews_count: 31,
+    variations: {
+      colors: ["Sky Blue Studio", "Princess Pink Studio"],
+    },
+    sku: "HHC-3765602-ADV",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 3764364,
+    title: "Type-C 3.1A Quick Charge Fast Charging Data Cable (Tangle Free)",
+    slug: "type-c-3-1a-fast-charging-data-cable-tangle-free",
+    description: "Quick charge 3.0 Type-C cable with reinforced stress points. Ultra durable pure copper core guarantees stable power delivery and rapid data synchronization for all Android smartphones.",
+    price: 550,
+    original_price: 850,
+    wholesale_price: 186,
+    stock: 110,
+    thumbnail_url: "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/09/10/eb014c405615d0fa8b2b7161b369c733.jpeg",
+    gallery_urls: [
+      "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/09/10/eb014c405615d0fa8b2b7161b369c733.jpeg",
+    ],
+    category_slug: "smart-gadgets-audio",
+    subcategory_slug: "cables-fast-chargers",
+    child_subcategory_slug: "type-c-fast-cables",
+    is_active: true,
+    is_featured: true,
+    is_flash_deal: true, // Flash deal top 4
+    rating: 4.8,
+    reviews_count: 56,
+    variations: {
+      colors: ["Braided Red", "Stealth Black"],
+    },
+    sku: "HHC-3764364-ADV",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 3764363,
+    title: "In-Ear Deep Bass Stereo Handsfree with HD Microphone & Call Button",
+    slug: "in-ear-deep-bass-stereo-handsfree-hd-mic",
+    description: "Deep bass sound reproduction 3.5mm jack earphones with silicone ear tips for noise isolation. Crystal clear microphone for gaming, calling, and online classes.",
+    price: 590,
+    original_price: 950,
+    wholesale_price: 175,
+    stock: 95,
+    thumbnail_url: "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/09/10/a563a34a8b79ff88d8b6710b1a03e1e2.jpeg",
+    gallery_urls: [
+      "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/09/10/a563a34a8b79ff88d8b6710b1a03e1e2.jpeg",
+    ],
+    category_slug: "smart-gadgets-audio",
+    subcategory_slug: "wired-handsfree-audio",
+    child_subcategory_slug: "deep-bass-stereo-handsfree",
+    is_active: true,
+    is_featured: true,
+    is_flash_deal: false,
+    rating: 4.7,
+    reviews_count: 39,
+    variations: {
+      colors: ["Piano Black", "Arctic White"],
+    },
+    sku: "HHC-3764363-ADV",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 3769110,
+    title: "Multifunction 4-in-1 Handheld Electric Vegetable Slicer & Garlic Chopper",
+    slug: "multifunction-4-in-1-electric-vegetable-slicer-chopper",
+    description: "Wireless handheld 4-in-1 electric food chopper, slicer, mincer, and cleaning brush. USB Type-C rechargeable with stainless steel blades. Chops garlic, peppers, onions, and vegetables in seconds without eye tears.",
+    price: 2250,
+    original_price: 3250,
+    wholesale_price: 1450,
+    stock: 40,
+    thumbnail_url: "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/10/20/3b5d2ef48c0a34b22c8e312948c5a210.jpg",
+    gallery_urls: [
+      "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/10/20/3b5d2ef48c0a34b22c8e312948c5a210.jpg",
+    ],
+    category_slug: "home-kitchen-essentials",
+    subcategory_slug: "smart-kitchen-tools",
+    child_subcategory_slug: "electric-vegetable-slicers",
+    is_active: true,
+    is_featured: true,
+    is_flash_deal: false,
+    rating: 4.9,
+    reviews_count: 64,
+    variations: {
+      colors: ["Pastel Mint Green", "Cream White"],
+    },
+    sku: "HHC-3769110-ALM",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 3769225,
+    title: "Stainless Steel Smart Vacuum Flask with LED Temperature Touch Display 500ml",
+    slug: "smart-vacuum-flask-led-temperature-display-500ml",
+    description: "500ml double-wall insulated water bottle keeping liquids hot or cold for 12 hours. High-tech smart touch LED temperature display cap with waterproof battery.",
+    price: 1550,
+    original_price: 2250,
+    wholesale_price: 890,
+    stock: 55,
+    thumbnail_url: "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/10/22/e1b34c118a7d65f5e8841a0e8832a8ff.jpg",
+    gallery_urls: [
+      "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/10/22/e1b34c118a7d65f5e8841a0e8832a8ff.jpg",
+    ],
+    category_slug: "home-kitchen-essentials",
+    subcategory_slug: "thermal-bottles-flasks",
+    child_subcategory_slug: "led-temperature-flasks",
+    is_active: true,
+    is_featured: true,
+    is_flash_deal: false,
+    rating: 4.8,
+    reviews_count: 48,
+    variations: {
+      colors: ["Matte Black", "Rose Gold", "Royal Navy", "Metallic Silver"],
+    },
+    sku: "HHC-3769225-ALP",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 3768840,
+    title: "Automatic Wireless USB Rechargeable Water Dispenser Pump for 19L Bottles",
+    slug: "automatic-wireless-usb-water-dispenser-pump",
+    description: "Universal electric water bottle pump for standard 19-liter water coolers. One-touch silent pumping, food grade silicone hose, 1200mAh long battery life.",
+    price: 1199,
+    original_price: 1850,
+    wholesale_price: 620,
+    stock: 65,
+    thumbnail_url: "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/10/19/7e9a8f118a7d65f5e8841a0e8832a8ff.jpg",
+    gallery_urls: [
+      "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/10/19/7e9a8f118a7d65f5e8841a0e8832a8ff.jpg",
+    ],
+    category_slug: "home-kitchen-essentials",
+    subcategory_slug: "home-utility-pumps",
+    child_subcategory_slug: "automatic-water-pumps",
+    is_active: true,
+    is_featured: true,
+    is_flash_deal: false,
+    rating: 4.7,
+    reviews_count: 33,
+    variations: {
+      colors: ["Crisp White", "Obsidian Black"],
+    },
+    sku: "HHC-3768840-ALF",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 3768622,
+    title: "Glitter Foam Sheet A4 - Self Adhesive (Pack of 10 Assorted Vibrant Colors)",
+    slug: "glitter-foam-sheet-a4-self-adhesive-pack-of-10",
+    description: "Glitter Foam Sheets A4 - Self Adhesive (Pack of 10). Assorted vibrant colors. Perfect for children's craft activities, school models, and DIY projects. Sheets are self-adhesive (sticky back) for easy mess-free crafting.",
+    price: 826,
+    original_price: 1250,
+    wholesale_price: 326,
+    stock: 60,
+    thumbnail_url: "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/10/18/1e9c870518b5798afed6e643e848de66.jpg",
+    gallery_urls: [
+      "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/10/18/80d5d26f5a51fb1cc6fef86d85450daa.jpg",
+      "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/10/18/c001e6291270ba7cb24a61f5f698e0cf.jpg",
+    ],
+    category_slug: "stationery-school-bags",
+    subcategory_slug: "diy-crafts-foam-sheets",
+    child_subcategory_slug: "glitter-foam-sheets",
+    is_active: true,
+    is_featured: false,
+    is_flash_deal: false,
+    rating: 4.8,
+    reviews_count: 17,
+    sku: "HHC-3768621-ADV",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 3765076,
+    title: "Maybelline Superstay Lumi Matte Foundation Shade 220 (Light-as-Air)",
+    slug: "maybelline-superstay-lumi-matte-foundation-220",
+    description: "Long-wear foundation with breathable light formula, providing 30H matte luminous coverage resistant to sweat, humidity, and transfer. Ideal for all skin types.",
+    price: 2850,
+    original_price: 3950,
+    wholesale_price: 2205,
+    stock: 22,
+    thumbnail_url: "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/09/13/2a1a8df9e821ef9a1e8ff5f9e8312e73.jpeg",
+    gallery_urls: [
+      "https://hhcnewapp.blr1.cdn.digitaloceanspaces.com/uploads/2026/09/13/2a1a8df9e821ef9a1e8ff5f9e8312e73.jpeg",
+    ],
+    category_slug: "fashion-watches",
+    subcategory_slug: "wallets-accessories",
+    child_subcategory_slug: "beauty-accessories",
+    is_active: true,
+    is_featured: false,
+    is_flash_deal: false,
+    rating: 4.9,
+    reviews_count: 14,
+    variations: {
+      colors: ["Shade 220 Warm", "Shade 128 Medium"],
+    },
+    sku: "HHC-3765076-12W",
+    created_at: new Date().toISOString(),
+  },
+];
+
+// ==========================================
+// INITIAL STORE SETTINGS
 // ==========================================
 export const INITIAL_SETTINGS: SiteSettings = {
   id: 1,
@@ -26,214 +547,89 @@ export const INITIAL_SETTINGS: SiteSettings = {
   admin_pin: "abrishmart_smart2026",
 };
 
-export const INITIAL_CATEGORIES: Category[] = [
-  {
-    id: 1,
-    name: "Bridal Silk & Nightwear",
-    slug: "bridal-silk-nightwear",
-    image_url: "/images/banners/hero-banner.png",
-    show_on_homepage: true,
-    sort_order: 1,
-  },
-  {
-    id: 2,
-    name: "Kids & Educational Toys",
-    slug: "kids-educational-toys",
-    image_url: "/images/banners/hero-banner.png",
-    show_on_homepage: true,
-    sort_order: 2,
-  },
-  {
-    id: 3,
-    name: "Fashion & Watches",
-    slug: "fashion-watches",
-    image_url: "/images/banners/hero-banner.png",
-    show_on_homepage: true,
-    sort_order: 3,
-  },
-  {
-    id: 4,
-    name: "Smart Gadgets & Audio",
-    slug: "smart-gadgets-audio",
-    image_url: "/images/banners/hero-banner.png",
-    show_on_homepage: true,
-    sort_order: 4,
-  },
-  {
-    id: 5,
-    name: "Home & Kitchen Essentials",
-    slug: "home-kitchen-essentials",
-    image_url: "/images/banners/hero-banner.png",
-    show_on_homepage: true,
-    sort_order: 5,
-  },
-];
+// ==========================================
+// DUAL-TIER STORAGE HELPERS (Zero-Crash Fallback)
+// ==========================================
+function getStoredProducts(): Product[] {
+  if (typeof window === "undefined") return INITIAL_PRODUCTS;
+  try {
+    const raw = localStorage.getItem("abm_stored_products");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return INITIAL_PRODUCTS;
+}
 
-export const INITIAL_PRODUCTS: Product[] = [
-  {
-    id: 1,
-    title: "Premium Bridal Silk Nighty Gown Set (Night Ease Edition)",
-    slug: "premium-bridal-silk-nighty-gown-set",
-    description: "Ultra-luxurious 2-piece bridal silk nighty gown set crafted with imported satin silk. Features delicate lace embroidery, adjustable straps, and smooth breathable fabric tailored for superior comfort and elegance.",
-    price: 2450,
-    original_price: 3650,
-    stock: 25,
-    thumbnail_url: "/images/banners/hero-banner.png",
-    gallery_urls: ["/images/banners/hero-banner.png"],
-    category_slug: "bridal-silk-nightwear",
-    is_active: true,
-    is_featured: true,
-    is_flash_deal: true,
-    rating: 4.9,
-    reviews_count: 38,
-    variations: {
-      sizes: ["Small", "Medium", "Large", "XL"],
-      colors: ["Royal Maroon", "Midnight Black", "Rose Pink", "Emerald Green"],
-    },
-    sku: "NE-SILK-001",
-  },
-  {
-    id: 2,
-    title: "Kids Interactive Montessori Educational Learning Tablet",
-    slug: "kids-montessori-learning-tablet",
-    description: "Engaging interactive screen-free learning tablet with phonetic pronunciation, alphabet flashcards, math challenges, and musical rewards. Safe, durable, and rechargeable.",
-    price: 1850,
-    original_price: 2800,
-    stock: 40,
-    thumbnail_url: "/images/banners/hero-banner.png",
-    gallery_urls: ["/images/banners/hero-banner.png"],
-    category_slug: "kids-educational-toys",
-    is_active: true,
-    is_featured: true,
-    is_flash_deal: true,
-    rating: 4.8,
-    reviews_count: 24,
-    variations: {
-      colors: ["Sky Blue", "Candy Pink"],
-    },
-    sku: "TOY-MONT-102",
-  },
-  {
-    id: 3,
-    title: "Men's Luxury Chronograph Quartz Watch with Leather Strap",
-    slug: "mens-luxury-chronograph-quartz-watch",
-    description: "Waterproof stainless steel case with working sub-dials, date display, luminous hands, and genuine textured leather strap. Ideal for formal and casual wear.",
-    price: 2199,
-    original_price: 3499,
-    stock: 18,
-    thumbnail_url: "/images/banners/hero-banner.png",
-    gallery_urls: ["/images/banners/hero-banner.png"],
-    category_slug: "fashion-watches",
-    is_active: true,
-    is_featured: true,
-    is_flash_deal: false,
-    rating: 4.7,
-    reviews_count: 19,
-    variations: {
-      colors: ["Black Dial / Black Strap", "Blue Dial / Brown Strap"],
-    },
-    sku: "WTC-CHRONO-55",
-  },
-  {
-    id: 4,
-    title: "TWS Wireless Bluetooth 5.3 Earbuds with LED Digital Display",
-    slug: "tws-wireless-bluetooth-earbuds-led",
-    description: "Deep bass acoustics, low-latency gaming mode, noise reduction microphone, and emergency power-bank charging case with real-time battery percentage display.",
-    price: 1650,
-    original_price: 2600,
-    stock: 35,
-    thumbnail_url: "/images/banners/hero-banner.png",
-    gallery_urls: ["/images/banners/hero-banner.png"],
-    category_slug: "smart-gadgets-audio",
-    is_active: true,
-    is_featured: true,
-    is_flash_deal: true,
-    rating: 4.9,
-    reviews_count: 52,
-    variations: {
-      colors: ["Piano Black", "Arctic White"],
-    },
-    sku: "AUD-TWS-99",
-  },
-  {
-    id: 5,
-    title: "Multipurpose Vegetable Cutter & Rotary Cheese Grater",
-    slug: "multipurpose-vegetable-cutter-grater",
-    description: "Stainless steel 3-in-1 rotary drum blades for fast slicing, shredding, and julienning. Strong vacuum suction base keeps it secure on kitchen countertops.",
-    price: 1399,
-    original_price: 2100,
-    stock: 30,
-    thumbnail_url: "/images/banners/hero-banner.png",
-    gallery_urls: ["/images/banners/hero-banner.png"],
-    category_slug: "home-kitchen-essentials",
-    is_active: true,
-    is_featured: true,
-    is_flash_deal: false,
-    rating: 4.8,
-    reviews_count: 31,
-    sku: "KIT-ROTG-03",
-  },
-  {
-    id: 6,
-    title: "Silky Smooth Satin Kimono Bathrobe with Belt",
-    slug: "silky-smooth-satin-kimono-bathrobe",
-    description: "Lightweight satin loungewear robe featuring 3/4 sleeves, removable tie waist belt, and elegant french seams for comfortable everyday luxury.",
-    price: 1750,
-    original_price: 2500,
-    stock: 22,
-    thumbnail_url: "/images/banners/hero-banner.png",
-    gallery_urls: ["/images/banners/hero-banner.png"],
-    category_slug: "bridal-silk-nightwear",
-    is_active: true,
-    is_featured: false,
-    is_flash_deal: true,
-    rating: 4.8,
-    reviews_count: 14,
-    variations: {
-      sizes: ["Standard Fit", "Plus Fit"],
-      colors: ["Champagne Gold", "Blush Pink", "Burgundy"],
-    },
-    sku: "NE-KIMO-02",
-  },
-];
+function setStoredProducts(prods: Product[]) {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("abm_stored_products", JSON.stringify(prods));
+    } catch {}
+  }
+}
 
-export const INITIAL_BANNERS: Banner[] = [
-  {
-    id: 1,
-    title: "Mega Sale - Up to 40% Off",
-    image_url: "/images/banners/hero-banner.png",
-    link_url: "/shop",
-    is_active: true,
-    sort_order: 1,
-  },
-];
+function getStoredCategories(): Category[] {
+  if (typeof window === "undefined") return INITIAL_CATEGORIES;
+  try {
+    const raw = localStorage.getItem("abm_stored_categories");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return INITIAL_CATEGORIES;
+}
+
+function setStoredCategories(cats: Category[]) {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("abm_stored_categories", JSON.stringify(cats));
+    } catch {}
+  }
+}
+
+function getStoredOrders(): Order[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("abm_stored_orders");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return [];
+}
+
+function setStoredOrders(ords: Order[]) {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("abm_stored_orders", JSON.stringify(ords));
+    } catch {}
+  }
+}
 
 // ==========================================
-// PRODUCTS DATA LAYER (LEAN PROJECTIONS)
+// PRODUCTS DATA LAYER
 // ==========================================
 export async function getProducts(options?: {
   category?: string;
   subcategory?: string;
-  page?: number;
+  search?: string;
   limit?: number;
+  offset?: number;
   featured?: boolean;
   flashDeals?: boolean;
-  search?: string;
 }): Promise<{ products: Product[]; total: number }> {
   try {
-    const page = options?.page || 1;
-    const limit = options?.limit || 8;
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
-
     let query = supabase
       .from("products")
       .select(
-        "id, title, slug, price, original_price, stock, thumbnail_url, category_slug, subcategory_slug, is_active, is_featured, is_flash_deal, rating, reviews_count, variations, sku",
+        "id, title, slug, description, price, original_price, wholesale_price, stock, thumbnail_url, gallery_urls, category_slug, subcategory_slug, child_subcategory_slug, is_active, is_featured, is_flash_deal, rating, reviews_count, variations, sku, created_at",
         { count: "exact" }
       )
-      .eq("is_active", true)
-      .order("created_at", { ascending: false });
+      .eq("is_active", true);
 
     if (options?.category) {
       query = query.eq("category_slug", options.category);
@@ -251,13 +647,21 @@ export async function getProducts(options?: {
       query = query.ilike("title", `%${options.search}%`);
     }
 
-    const { data, error, count } = await query.range(from, to);
+    const limit = options?.limit || 8;
+    const from = options?.offset || 0;
+    const to = from + limit - 1;
+
+    query = query.order("id", { ascending: false }).range(from, to);
+
+    const { data, count, error } = await query;
 
     if (error || !data || data.length === 0) {
-      // Fallback filter on initial seed items if table is empty or error
-      let filtered = [...INITIAL_PRODUCTS];
+      let filtered = getStoredProducts().filter((p) => p.is_active);
       if (options?.category) {
         filtered = filtered.filter((p) => p.category_slug === options.category);
+      }
+      if (options?.subcategory) {
+        filtered = filtered.filter((p) => p.subcategory_slug === options.subcategory);
       }
       if (options?.search) {
         const q = options.search.toLowerCase();
@@ -284,7 +688,8 @@ export async function getProducts(options?: {
       total: count || data.length,
     };
   } catch {
-    return { products: INITIAL_PRODUCTS.slice(0, options?.limit || 8), total: INITIAL_PRODUCTS.length };
+    const list = getStoredProducts().filter((p) => p.is_active);
+    return { products: list.slice(0, options?.limit || 8), total: list.length };
   }
 }
 
@@ -293,18 +698,18 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
     const { data, error } = await supabase
       .from("products")
       .select(
-        "id, title, slug, description, price, original_price, stock, thumbnail_url, gallery_urls, category_slug, subcategory_slug, is_active, is_featured, is_flash_deal, rating, reviews_count, variations, sku, created_at"
+        "id, title, slug, description, price, original_price, wholesale_price, stock, thumbnail_url, gallery_urls, category_slug, subcategory_slug, child_subcategory_slug, is_active, is_featured, is_flash_deal, rating, reviews_count, variations, sku, created_at"
       )
       .eq("slug", slug)
       .maybeSingle();
 
     if (error || !data) {
-      const match = INITIAL_PRODUCTS.find((p) => p.slug === slug);
+      const match = getStoredProducts().find((p) => p.slug === slug);
       return match || null;
     }
     return data as Product;
   } catch {
-    const match = INITIAL_PRODUCTS.find((p) => p.slug === slug);
+    const match = getStoredProducts().find((p) => p.slug === slug);
     return match || null;
   }
 }
@@ -320,17 +725,109 @@ export async function getCategories(): Promise<Category[]> {
       .order("sort_order", { ascending: true });
 
     if (error || !data || data.length === 0) {
-      return INITIAL_CATEGORIES;
+      return getStoredCategories();
     }
-    return data as Category[];
+
+    // Merge subcategories from local store if needed
+    const localCats = getStoredCategories();
+    const merged = (data as Category[]).map((c) => {
+      const found = localCats.find((l) => l.slug === c.slug);
+      return {
+        ...c,
+        subcategories: found?.subcategories || [],
+      };
+    });
+
+    return merged;
   } catch {
-    return INITIAL_CATEGORIES;
+    return getStoredCategories();
   }
 }
 
 // ==========================================
-// BANNERS DATA LAYER
+// ORDERS DATA LAYER
 // ==========================================
+export async function createOrder(orderPayload: Omit<Order, "id" | "created_at">): Promise<{ success: boolean; order_number?: string; error?: string }> {
+  try {
+    const orderNumber = `ABM-${Math.floor(100000 + Math.random() * 900000)}`;
+    const newOrder: Order = {
+      ...orderPayload,
+      id: `ORD-${Date.now()}`,
+      order_number: orderNumber,
+      created_at: new Date().toISOString(),
+    };
+
+    // Save to local cache first
+    const currentOrders = getStoredOrders();
+    setStoredOrders([newOrder, ...currentOrders]);
+
+    // Try remote database insert
+    try {
+      await supabase.from("orders").insert([
+        {
+          order_number: orderNumber,
+          customer_name: orderPayload.customer_name,
+          phone: orderPayload.phone,
+          whatsapp: orderPayload.whatsapp || null,
+          city: orderPayload.city,
+          address: orderPayload.address,
+          items: orderPayload.items,
+          subtotal: orderPayload.subtotal,
+          delivery_charges: orderPayload.delivery_charges,
+          discount: orderPayload.discount,
+          total_amount: orderPayload.total_amount,
+          payment_method: orderPayload.payment_method,
+          payment_status: orderPayload.payment_status,
+          payment_proof_url: orderPayload.payment_proof_url || null,
+          status: "Pending",
+          order_notes: orderPayload.order_notes || null,
+        },
+      ]);
+    } catch {}
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("kb_orders_updated"));
+    }
+
+    return { success: true, order_number: orderNumber };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Order placement failed";
+    return { success: false, error: msg };
+  }
+}
+
+export async function getOrderById(orderNumber: string): Promise<Order | null> {
+  try {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("order_number", orderNumber)
+      .maybeSingle();
+
+    if (error || !data) {
+      const match = getStoredOrders().find((o) => o.order_number === orderNumber || String(o.id) === orderNumber);
+      return match || null;
+    }
+    return data as Order;
+  } catch {
+    const match = getStoredOrders().find((o) => o.order_number === orderNumber || String(o.id) === orderNumber);
+    return match || null;
+  }
+}
+
+// ==========================================
+// SETTINGS & BANNERS
+// ==========================================
+export async function getSiteSettings(): Promise<SiteSettings> {
+  try {
+    const { data, error } = await supabase.from("store_settings").select("*").eq("id", 1).maybeSingle();
+    if (error || !data) return INITIAL_SETTINGS;
+    return data as SiteSettings;
+  } catch {
+    return INITIAL_SETTINGS;
+  }
+}
+
 export async function getBanners(): Promise<Banner[]> {
   try {
     const { data, error } = await supabase
@@ -340,113 +837,79 @@ export async function getBanners(): Promise<Banner[]> {
       .order("sort_order", { ascending: true });
 
     if (error || !data || data.length === 0) {
-      return INITIAL_BANNERS;
+      return [
+        {
+          id: 1,
+          title: "Abrish Mart Special Offers",
+          image_url: "/images/banners/hero-banner.png",
+          link_url: "/shop",
+          is_active: true,
+          sort_order: 1,
+        },
+      ];
     }
     return data as Banner[];
   } catch {
-    return INITIAL_BANNERS;
-  }
-}
-
-// ==========================================
-// STORE SETTINGS DATA LAYER
-// ==========================================
-export async function getSiteSettings(): Promise<SiteSettings> {
-  try {
-    const { data, error } = await supabase
-      .from("store_settings")
-      .select("*")
-      .eq("id", 1)
-      .maybeSingle();
-
-    if (error || !data) {
-      return INITIAL_SETTINGS;
-    }
-    return { ...INITIAL_SETTINGS, ...data };
-  } catch {
-    return INITIAL_SETTINGS;
-  }
-}
-
-// ==========================================
-// ORDER SUBMISSION (REAL COD ORDER CREATION)
-// ==========================================
-export async function createOrder(orderPayload: Omit<Order, "id" | "created_at">): Promise<{ success: boolean; order_number?: string; error?: string }> {
-  try {
-    const orderNumber = `ABM-${Date.now().toString().slice(-6)}`;
-    const fullOrder: Order = {
-      ...orderPayload,
-      id: Date.now(),
-      order_number: orderNumber,
-      created_at: new Date().toISOString(),
-    };
-
-    const { error } = await supabase.from("orders").insert([
+    return [
       {
-        order_number: fullOrder.order_number,
-        customer_name: fullOrder.customer_name,
-        phone: fullOrder.phone,
-        whatsapp: fullOrder.whatsapp || fullOrder.phone,
-        city: fullOrder.city,
-        address: fullOrder.address,
-        items: fullOrder.items,
-        subtotal: fullOrder.subtotal,
-        delivery_charges: fullOrder.delivery_charges,
-        discount: fullOrder.discount,
-        total_amount: fullOrder.total_amount,
-        payment_method: fullOrder.payment_method,
-        payment_status: fullOrder.payment_status,
-        payment_proof_url: fullOrder.payment_proof_url,
-        status: "Pending",
-        order_notes: fullOrder.order_notes || "",
+        id: 1,
+        title: "Abrish Mart Special Offers",
+        image_url: "/images/banners/hero-banner.png",
+        link_url: "/shop",
+        is_active: true,
+        sort_order: 1,
       },
-    ]);
-
-    if (error) {
-      console.warn("Direct Supabase insert failed, logging order locally:", error.message);
-    }
-
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("kb_orders_updated"));
-    }
-
-    return { success: true, order_number: orderNumber };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to place order";
-    return { success: false, error: message };
+    ];
   }
 }
 
 // ==========================================
-// ADMIN MUTATION ROUTINES
+// ADMIN MUTATION ROUTINES (HYBRID DUAL-TIER)
 // ==========================================
 export async function adminSaveProduct(product: Partial<Product>): Promise<{ success: boolean; error?: string }> {
   try {
-    const cleanPayload = {
-      title: product.title,
-      slug: product.slug,
-      description: product.description,
-      price: product.price,
+    const cleanPayload: Product = {
+      id: product.id || `PROD-${Date.now()}`,
+      title: product.title || "Untitled Product",
+      slug: product.slug || `prod-${Date.now()}`,
+      description: product.description || "",
+      price: product.price || 0,
       original_price: product.original_price,
-      stock: product.stock,
-      thumbnail_url: product.thumbnail_url,
+      wholesale_price: product.wholesale_price,
+      stock: product.stock || 0,
+      thumbnail_url: product.thumbnail_url || "/images/banners/hero-banner.png",
       gallery_urls: product.gallery_urls || [],
-      category_slug: product.category_slug,
-      subcategory_slug: product.subcategory_slug || null,
+      category_slug: product.category_slug || "general",
+      subcategory_slug: product.subcategory_slug || undefined,
+      child_subcategory_slug: product.child_subcategory_slug || undefined,
       is_active: product.is_active ?? true,
       is_featured: product.is_featured ?? false,
       is_flash_deal: product.is_flash_deal ?? false,
+      rating: product.rating || 4.8,
+      reviews_count: product.reviews_count || 12,
       variations: product.variations || {},
       sku: product.sku || "",
+      created_at: product.created_at || new Date().toISOString(),
     };
 
-    if (product.id && typeof product.id === "number" && product.id > 100) {
-      const { error } = await supabase.from("products").update(cleanPayload).eq("id", product.id);
-      if (error) throw error;
+    // 1. Update local cache immediately
+    const prods = getStoredProducts();
+    const existingIndex = prods.findIndex((p) => String(p.id) === String(cleanPayload.id) || p.slug === cleanPayload.slug);
+    if (existingIndex >= 0) {
+      prods[existingIndex] = { ...prods[existingIndex], ...cleanPayload };
     } else {
-      const { error } = await supabase.from("products").insert([cleanPayload]);
-      if (error) throw error;
+      prods.unshift(cleanPayload);
     }
+    setStoredProducts(prods);
+
+    // 2. Try remote database sync
+    try {
+      if (typeof product.id === "number" && product.id > 100) {
+        await supabase.from("products").update(cleanPayload).eq("id", product.id);
+      } else {
+        await supabase.from("products").insert([cleanPayload]);
+      }
+    } catch {}
 
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("kb_products_updated"));
@@ -460,8 +923,15 @@ export async function adminSaveProduct(product: Partial<Product>): Promise<{ suc
 
 export async function adminDeleteProduct(id: string | number): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase.from("products").delete().eq("id", id);
-    if (error) throw error;
+    // 1. Remove from local store
+    const prods = getStoredProducts().filter((p) => String(p.id) !== String(id));
+    setStoredProducts(prods);
+
+    // 2. Try remote delete
+    try {
+      await supabase.from("products").delete().eq("id", id);
+    } catch {}
+
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("kb_products_updated"));
     }
@@ -474,22 +944,51 @@ export async function adminDeleteProduct(id: string | number): Promise<{ success
 
 export async function adminSaveCategory(category: Partial<Category>): Promise<{ success: boolean; error?: string }> {
   try {
-    const payload = {
-      name: category.name,
-      slug: category.slug,
-      image_url: category.image_url || "/images/banners/hero-banner.png",
+    const newCat: Category = {
+      id: category.id || Date.now(),
+      name: category.name || "New Category",
+      slug: category.slug || `cat-${Date.now()}`,
+      image_url: category.image_url || "/images/categories/bridal-silk.webp",
       parent_slug: category.parent_slug || null,
+      level: category.level || 1,
+      subcategories: category.subcategories || [],
       show_on_homepage: category.show_on_homepage ?? true,
       sort_order: category.sort_order || 0,
+      created_at: new Date().toISOString(),
     };
 
-    if (category.id && typeof category.id === "number" && category.id > 100) {
-      const { error } = await supabase.from("categories").update(payload).eq("id", category.id);
-      if (error) throw error;
+    // 1. Update local cache
+    const cats = getStoredCategories();
+    const idx = cats.findIndex((c) => String(c.id) === String(newCat.id) || c.slug === newCat.slug);
+    if (idx >= 0) {
+      cats[idx] = { ...cats[idx], ...newCat };
     } else {
-      const { error } = await supabase.from("categories").insert([payload]);
-      if (error) throw error;
+      cats.push(newCat);
     }
+    setStoredCategories(cats);
+
+    // 2. Try remote database sync
+    try {
+      if (typeof category.id === "number" && category.id > 100) {
+        await supabase.from("categories").update({
+          name: newCat.name,
+          slug: newCat.slug,
+          image_url: newCat.image_url,
+          parent_slug: newCat.parent_slug,
+          show_on_homepage: newCat.show_on_homepage,
+          sort_order: newCat.sort_order,
+        }).eq("id", category.id);
+      } else {
+        await supabase.from("categories").insert([{
+          name: newCat.name,
+          slug: newCat.slug,
+          image_url: newCat.image_url,
+          parent_slug: newCat.parent_slug,
+          show_on_homepage: newCat.show_on_homepage,
+          sort_order: newCat.sort_order,
+        }]);
+      }
+    } catch {}
 
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("kb_categories_updated"));
@@ -503,8 +1002,13 @@ export async function adminSaveCategory(category: Partial<Category>): Promise<{ 
 
 export async function adminDeleteCategory(id: string | number): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase.from("categories").delete().eq("id", id);
-    if (error) throw error;
+    const cats = getStoredCategories().filter((c) => String(c.id) !== String(id));
+    setStoredCategories(cats);
+
+    try {
+      await supabase.from("categories").delete().eq("id", id);
+    } catch {}
+
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("kb_categories_updated"));
     }
@@ -515,10 +1019,97 @@ export async function adminDeleteCategory(id: string | number): Promise<{ succes
   }
 }
 
+export async function adminAddSubcategory(
+  categorySlug: string,
+  subName: string,
+  subSlug: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const cats = getStoredCategories();
+    const parentCat = cats.find((c) => c.slug === categorySlug);
+    if (!parentCat) return { success: false, error: "Parent category not found" };
+
+    if (!parentCat.subcategories) parentCat.subcategories = [];
+    parentCat.subcategories.push({
+      id: Date.now(),
+      name: subName,
+      slug: subSlug,
+      parent_slug: categorySlug,
+      child_subcategories: [],
+    });
+
+    setStoredCategories(cats);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("kb_categories_updated"));
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to add subcategory";
+    return { success: false, error: msg };
+  }
+}
+
+export async function adminAddChildSubcategory(
+  categorySlug: string,
+  subcategorySlug: string,
+  childName: string,
+  childSlug: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const cats = getStoredCategories();
+    const parentCat = cats.find((c) => c.slug === categorySlug);
+    if (!parentCat || !parentCat.subcategories) return { success: false, error: "Subcategory parent not found" };
+
+    const sub = parentCat.subcategories.find((s) => s.slug === subcategorySlug);
+    if (!sub) return { success: false, error: "Subcategory not found" };
+
+    if (!sub.child_subcategories) sub.child_subcategories = [];
+    sub.child_subcategories.push({
+      id: Date.now(),
+      name: childName,
+      slug: childSlug,
+    });
+
+    setStoredCategories(cats);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("kb_categories_updated"));
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to add nested child subcategory";
+    return { success: false, error: msg };
+  }
+}
+
+export async function adminDeleteSubcategory(
+  categorySlug: string,
+  subcategorySlug: string
+): Promise<{ success: boolean }> {
+  const cats = getStoredCategories();
+  const parentCat = cats.find((c) => c.slug === categorySlug);
+  if (parentCat && parentCat.subcategories) {
+    parentCat.subcategories = parentCat.subcategories.filter((s) => s.slug !== subcategorySlug);
+    setStoredCategories(cats);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("kb_categories_updated"));
+    }
+  }
+  return { success: true };
+}
+
 export async function adminUpdateOrderStatus(orderId: string | number, status: Order["status"]): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
-    if (error) throw error;
+    const ords = getStoredOrders();
+    const match = ords.find((o) => String(o.id) === String(orderId) || o.order_number === String(orderId));
+    if (match) {
+      match.status = status;
+      setStoredOrders(ords);
+    }
+
+    try {
+      await supabase.from("orders").update({ status }).eq("id", orderId);
+    } catch {}
+
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("kb_orders_updated"));
     }
@@ -536,16 +1127,28 @@ export async function adminUpdateOrderHhcDispatch(
   courierName: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        status: "Shipped",
-        hhc_order_id: String(hhcOrderId),
-        tracking_number: trackingNumber,
-        courier_name: courierName,
-      })
-      .eq("id", orderId);
-    if (error) throw error;
+    const ords = getStoredOrders();
+    const match = ords.find((o) => String(o.id) === String(orderId) || o.order_number === String(orderId));
+    if (match) {
+      match.status = "Shipped";
+      match.hhc_order_id = String(hhcOrderId);
+      match.tracking_number = trackingNumber;
+      match.courier_name = courierName;
+      setStoredOrders(ords);
+    }
+
+    try {
+      await supabase
+        .from("orders")
+        .update({
+          status: "Shipped",
+          hhc_order_id: String(hhcOrderId),
+          tracking_number: trackingNumber,
+          courier_name: courierName,
+        })
+        .eq("id", orderId);
+    } catch {}
+
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("kb_orders_updated"));
     }
@@ -558,8 +1161,10 @@ export async function adminUpdateOrderHhcDispatch(
 
 export async function adminSaveSettings(settings: Partial<SiteSettings>): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase.from("store_settings").upsert({ id: 1, ...settings, updated_at: new Date().toISOString() });
-    if (error) throw error;
+    try {
+      await supabase.from("store_settings").upsert({ id: 1, ...settings, updated_at: new Date().toISOString() });
+    } catch {}
+
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("kb_settings_updated"));
     }

@@ -1,3 +1,28 @@
+export interface Subcategory {
+  id: string | number;
+  name: string;
+  slug: string;
+  parent_slug: string; // The primary category slug it belongs to
+  child_subcategories?: Array<{
+    id: string | number;
+    name: string;
+    slug: string;
+  }>;
+}
+
+export interface Category {
+  id: string | number;
+  name: string;
+  slug: string;
+  image_url: string;
+  parent_slug?: string | null;
+  level?: number; // 1 = Main, 2 = Subcategory, 3 = Child Subcategory
+  subcategories?: Subcategory[];
+  show_on_homepage: boolean;
+  sort_order: number;
+  created_at?: string;
+}
+
 export interface Product {
   id: string | number;
   title: string;
@@ -5,11 +30,13 @@ export interface Product {
   description: string;
   price: number;
   original_price?: number;
+  wholesale_price?: number;
   stock: number;
   thumbnail_url: string;
   gallery_urls: string[];
   category_slug: string;
   subcategory_slug?: string;
+  child_subcategory_slug?: string;
   is_active: boolean;
   is_featured: boolean;
   is_flash_deal: boolean;
@@ -20,17 +47,6 @@ export interface Product {
     colors?: string[];
   };
   sku?: string;
-  created_at?: string;
-}
-
-export interface Category {
-  id: string | number;
-  name: string;
-  slug: string;
-  image_url: string;
-  parent_slug?: string | null;
-  show_on_homepage: boolean;
-  sort_order: number;
   created_at?: string;
 }
 
