@@ -529,6 +529,33 @@ export async function adminUpdateOrderStatus(orderId: string | number, status: O
   }
 }
 
+export async function adminUpdateOrderHhcDispatch(
+  orderId: string | number,
+  hhcOrderId: string | number,
+  trackingNumber: string,
+  courierName: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        status: "Shipped",
+        hhc_order_id: String(hhcOrderId),
+        tracking_number: trackingNumber,
+        courier_name: courierName,
+      })
+      .eq("id", orderId);
+    if (error) throw error;
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("kb_orders_updated"));
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Dispatch update failed";
+    return { success: false, error: msg };
+  }
+}
+
 export async function adminSaveSettings(settings: Partial<SiteSettings>): Promise<{ success: boolean; error?: string }> {
   try {
     const { error } = await supabase.from("store_settings").upsert({ id: 1, ...settings, updated_at: new Date().toISOString() });
