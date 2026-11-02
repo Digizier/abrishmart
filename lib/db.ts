@@ -590,10 +590,10 @@ function setStoredCategories(cats: Category[]) {
   }
 }
 
-function getStoredOrders(): Order[] {
+export function getStoredOrders(): Order[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem("abm_stored_orders");
+    const raw = localStorage.getItem("abm_stored_orders") || localStorage.getItem("abm_orders");
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed;
@@ -602,10 +602,11 @@ function getStoredOrders(): Order[] {
   return [];
 }
 
-function setStoredOrders(ords: Order[]) {
+export function setStoredOrders(ords: Order[]) {
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem("abm_stored_orders", JSON.stringify(ords));
+      localStorage.setItem("abm_orders", JSON.stringify(ords));
     } catch {}
   }
 }
@@ -747,6 +748,42 @@ export async function getCategories(): Promise<Category[]> {
 // ==========================================
 // ORDERS DATA LAYER
 // ==========================================
+// ==========================================
+// ORDERS DATA LAYER
+// ==========================================
+export async function getOrders(): Promise<Order[]> {
+  const localOrders = getStoredOrders();
+  try {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error && data && data.length > 0) {
+      const remoteOrders = data as Order[];
+      const map = new Map<string, Order>();
+      // First populate with local orders
+      localOrders.forEach((o) => {
+        const key = o.order_number || String(o.id);
+        if (key) map.set(key, o);
+      });
+      // Merge remote orders
+      remoteOrders.forEach((o) => {
+        const key = o.order_number || String(o.id);
+        if (key) map.set(key, o);
+      });
+      const merged = Array.from(map.values()).sort((a, b) => {
+        const tA = new Date(a.created_at || "").getTime();
+        const tB = new Date(b.created_at || "").getTime();
+        return tB - tA;
+      });
+      setStoredOrders(merged);
+      return merged;
+    }
+  } catch {}
+  return localOrders;
+}
+
 export async function createOrder(orderPayload: Omit<Order, "id" | "created_at">): Promise<{ success: boolean; order_number?: string; error?: string }> {
   try {
     const orderNumber = `ABM-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -754,14 +791,24 @@ export async function createOrder(orderPayload: Omit<Order, "id" | "created_at">
       ...orderPayload,
       id: `ORD-${Date.now()}`,
       order_number: orderNumber,
+      status: "Pending",
       created_at: new Date().toISOString(),
     };
 
-    // Save to local cache first
+    // 1. Save to local cache first
     const currentOrders = getStoredOrders();
     setStoredOrders([newOrder, ...currentOrders]);
 
-    // Try remote database insert
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("abm_last_order_id", orderNumber);
+        localStorage.setItem("abm_last_order", JSON.stringify(newOrder));
+        sessionStorage.setItem("abm_last_order_id", orderNumber);
+      } catch {}
+      window.dispatchEvent(new CustomEvent("kb_orders_updated", { detail: newOrder }));
+    }
+
+    // 2. Non-blocking remote database insert
     try {
       await supabase.from("orders").insert([
         {
@@ -785,10 +832,6 @@ export async function createOrder(orderPayload: Omit<Order, "id" | "created_at">
       ]);
     } catch {}
 
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("kb_orders_updated"));
-    }
-
     return { success: true, order_number: orderNumber };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Order placement failed";
@@ -797,6 +840,9 @@ export async function createOrder(orderPayload: Omit<Order, "id" | "created_at">
 }
 
 export async function getOrderById(orderNumber: string): Promise<Order | null> {
+  const localList = getStoredOrders();
+  const localMatch = localList.find((o) => o.order_number === orderNumber || String(o.id) === orderNumber);
+
   try {
     const { data, error } = await supabase
       .from("orders")
@@ -804,15 +850,22 @@ export async function getOrderById(orderNumber: string): Promise<Order | null> {
       .eq("order_number", orderNumber)
       .maybeSingle();
 
-    if (error || !data) {
-      const match = getStoredOrders().find((o) => o.order_number === orderNumber || String(o.id) === orderNumber);
-      return match || null;
+    if (!error && data) {
+      return data as Order;
     }
-    return data as Order;
-  } catch {
-    const match = getStoredOrders().find((o) => o.order_number === orderNumber || String(o.id) === orderNumber);
-    return match || null;
+  } catch {}
+
+  if (typeof window !== "undefined") {
+    try {
+      const last = localStorage.getItem("abm_last_order");
+      if (last) {
+        const p = JSON.parse(last);
+        if (p.order_number === orderNumber) return p;
+      }
+    } catch {}
   }
+
+  return localMatch || null;
 }
 
 // ==========================================

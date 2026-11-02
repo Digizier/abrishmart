@@ -1,25 +1,38 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Home, ShoppingBag } from "lucide-react";
+import { Home, ShoppingBag, Loader2 } from "lucide-react";
 
 export default function NotFound() {
   const router = useRouter();
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const path = window.location.pathname;
-      if (path.includes("/order-confirmation/")) {
+      if (path.includes("/order-confirmation")) {
+        setIsRedirecting(true);
         const parts = path.split("/").filter(Boolean);
-        const orderId = parts[parts.length - 1];
-        if (orderId && orderId !== "order-confirmation") {
-          router.replace(`/order-confirmation?orderId=${orderId}`);
-        }
+        const orderId = parts.length > 1 ? parts[parts.length - 1] : "";
+        const target =
+          orderId && orderId !== "order-confirmation"
+            ? `/order-confirmation/?orderId=${orderId}`
+            : "/order-confirmation/";
+        window.location.replace(target);
       }
     }
   }, [router]);
+
+  if (isRedirecting) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 py-16 text-center space-y-4">
+        <Loader2 className="w-10 h-10 text-brand-pink animate-spin mx-auto" />
+        <h2 className="text-base font-bold text-slate-800">Finalizing Your Order Confirmation...</h2>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 py-16 text-center space-y-4">

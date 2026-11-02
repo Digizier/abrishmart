@@ -44,6 +44,7 @@ import { Product, Category, Order, Banner, SiteSettings } from "@/lib/types";
 import {
   getProducts,
   getCategories,
+  getOrders,
   getBanners,
   getSiteSettings,
   adminSaveProduct,
@@ -222,15 +223,9 @@ export default function AdminPage() {
       setBanners(bans);
       setSettings(setts);
 
-      // Fetch orders from Supabase
-      const { data: ords } = await supabase
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (ords && ords.length > 0) {
-        setOrders(ords as Order[]);
-      }
+      // Fetch orders using dual-tier hybrid persistence (remote + local cache)
+      const ords = await getOrders();
+      setOrders(ords);
     } catch (err) {
       console.warn("Admin fetch error:", err);
     } finally {
@@ -241,6 +236,17 @@ export default function AdminPage() {
   useEffect(() => {
     if (isAuthenticated) {
       loadData();
+
+      // Listen for instant real-time order updates
+      const handleOrdersUpdate = () => {
+        getOrders().then((ords) => setOrders(ords));
+      };
+      window.addEventListener("kb_orders_updated", handleOrdersUpdate);
+      window.addEventListener("storage", handleOrdersUpdate);
+      return () => {
+        window.removeEventListener("kb_orders_updated", handleOrdersUpdate);
+        window.removeEventListener("storage", handleOrdersUpdate);
+      };
     }
   }, [isAuthenticated]);
 

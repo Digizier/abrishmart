@@ -91,7 +91,7 @@ export default function CheckoutPage() {
       if (typeof window !== "undefined") {
         sessionStorage.setItem("abm_last_order_id", orderRes.order_number);
       }
-      router.push(`/order-confirmation?orderId=${orderRes.order_number}`);
+      router.push(`/order-confirmation/?orderId=${orderRes.order_number}`);
     } else {
       setErrorMessage(orderRes.error || "Failed to submit order. Please try again.");
     }
