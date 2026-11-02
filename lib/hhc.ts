@@ -204,10 +204,46 @@ export async function hhcGetProductsBySupplier(
       if (rawProducts.length > 0) {
         const normalized: HHCCatalogItem[] = rawProducts.map((p: any) => {
           const wholesale = parseFloat(p.wholesalePrice || p.price || 300);
-          const thumb =
-            typeof p.product_thumbnail === "object"
-              ? p.product_thumbnail?.original_url
-              : p.product_thumbnail || "https://placehold.co/400x400";
+          let rawThumb = "";
+          if (typeof p.product_thumbnail === "string") {
+            rawThumb = p.product_thumbnail;
+          } else if (p.product_thumbnail && typeof p.product_thumbnail === "object") {
+            rawThumb = p.product_thumbnail.original_url || p.product_thumbnail.url || "";
+          }
+
+          if (!rawThumb && Array.isArray(p.product_galleries) && p.product_galleries.length > 0) {
+            const firstG = p.product_galleries[0];
+            rawThumb = typeof firstG === "string" ? firstG : firstG?.original_url || firstG?.url || "";
+          }
+
+          const thumb = (rawThumb || "/images/banners/hero-banner.png").replace(/^http:\/\//, "https://");
+
+          const gallery: string[] =
+            Array.isArray(p.product_galleries) && p.product_galleries.length > 0
+              ? p.product_galleries
+                  .map((g: any) =>
+                    (typeof g === "string" ? g : g?.original_url || g?.url || "").replace(/^http:\/\//, "https://")
+                  )
+                  .filter(Boolean)
+              : [thumb];
+
+          // Infer best matching category from product name
+          const nameLower = String(p.name || "").toLowerCase();
+          let category = "General";
+          if (nameLower.includes("toy") || nameLower.includes("kid") || nameLower.includes("baby") || nameLower.includes("puzzle") || nameLower.includes("game")) {
+            category = "Kids & Educational Toys";
+          } else if (nameLower.includes("watch") || nameLower.includes("strap") || nameLower.includes("bracelet") || nameLower.includes("wallet")) {
+            category = "Fashion & Watches";
+          } else if (nameLower.includes("tws") || nameLower.includes("earbud") || nameLower.includes("headphone") || nameLower.includes("cable") || nameLower.includes("charge")) {
+            category = "Smart Gadgets & Audio";
+          } else if (nameLower.includes("kitchen") || nameLower.includes("slicer") || nameLower.includes("bottle") || nameLower.includes("flask") || nameLower.includes("pump")) {
+            category = "Home & Kitchen Essentials";
+          } else if (nameLower.includes("bag") || nameLower.includes("backpack") || nameLower.includes("pencil") || nameLower.includes("craft") || nameLower.includes("stationery")) {
+            category = "Stationery & School Bags";
+          } else if (nameLower.includes("silk") || nameLower.includes("nighty") || nameLower.includes("gown") || nameLower.includes("robe") || nameLower.includes("kimono")) {
+            category = "Bridal Silk & Nightwear";
+          }
+
           return {
             id: Number(p.id),
             name: String(p.name),
@@ -218,12 +254,12 @@ export async function hhcGetProductsBySupplier(
             stockStatus: (p.stock_status_name || "In stock") as any,
             weight: parseFloat(p.weight || 0.5),
             storeID: Number(p.store_id || numericStoreId),
-            storeName: String(p.store_name || "ADVANI"),
-            hubName: String(p.hub_name || "Saddar, Karachi Hub"),
+            storeName: String(p.store_name || "HHC Supplier"),
+            hubName: String(p.hub_name || "Karachi Hub"),
             thumbnail: thumb,
-            gallery: Array.isArray(p.product_galleries) ? p.product_galleries : [thumb],
-            category: "General",
-            sku: `HHC-${p.id}`,
+            gallery,
+            category,
+            sku: p.sku || `HHC-${p.id}`,
           };
         });
         return { success: true, data: normalized };

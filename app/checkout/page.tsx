@@ -88,7 +88,10 @@ export default function CheckoutPage() {
 
     if (orderRes.success && orderRes.order_number) {
       clearCart();
-      router.push(`/order-confirmation/${orderRes.order_number}`);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("abm_last_order_id", orderRes.order_number);
+      }
+      router.push(`/order-confirmation?orderId=${orderRes.order_number}`);
     } else {
       setErrorMessage(orderRes.error || "Failed to submit order. Please try again.");
     }

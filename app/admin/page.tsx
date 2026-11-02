@@ -326,6 +326,7 @@ export default function AdminPage() {
         description: item.description || "High quality product sourced from HHC Dropshipping Pakistan.",
         price: pricing.salePrice,
         original_price: Math.round(pricing.salePrice * 1.35),
+        wholesale_price: item.wholesalePrice,
         stock: item.stock || 40,
         thumbnail_url: item.thumbnail,
         gallery_urls: item.gallery && item.gallery.length > 0 ? item.gallery : [item.thumbnail],
@@ -2017,12 +2018,19 @@ export default function AdminPage() {
                         {/* Thumbnail */}
                         <div className="relative aspect-square w-full bg-slate-100 border-b border-slate-100">
                           <Image
-                            src={item.thumbnail}
+                            src={item.thumbnail || "/images/banners/hero-banner.png"}
                             alt={item.name}
                             fill
                             sizes="(max-width: 768px) 100vw, 300px"
                             className="object-cover"
                             unoptimized
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              const target = e.currentTarget as HTMLImageElement;
+                              if (target && !target.src.includes("hero-banner.png")) {
+                                target.src = "/images/banners/hero-banner.png";
+                              }
+                            }}
                           />
                           <span className="absolute top-2 left-2 bg-slate-900/80 text-white text-[9px] font-bold px-2 py-0.5 rounded-full backdrop-blur-xs">
                             {item.storeName}

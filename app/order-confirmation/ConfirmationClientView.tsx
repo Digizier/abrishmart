@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, PackageCheck, Phone, ArrowRight, ShieldCheck, Home } from "lucide-react";
+import { CheckCircle2, PackageCheck, Phone, ShieldCheck, Home } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Order } from "@/lib/types";
 
@@ -13,14 +13,35 @@ export default function ConfirmationClientView({ orderId }: { orderId: string })
   useEffect(() => {
     async function fetchOrder() {
       if (orderId && orderId !== "ABM-SUCCESS") {
-        const { data } = await supabase
-          .from("orders")
-          .select("id, order_number, customer_name, phone, city, address, items, subtotal, delivery_charges, discount, total_amount, payment_method, status, created_at")
-          .eq("order_number", orderId)
-          .maybeSingle();
+        // 1. Dual-tier: Check local storage first for zero-latency display
+        try {
+          const stored = localStorage.getItem("abm_orders");
+          if (stored) {
+            const list: Order[] = JSON.parse(stored);
+            const matched = list.find((o) => o.order_number === orderId);
+            if (matched) {
+              setOrder(matched);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch {
+          // ignore
+        }
 
-        if (data) {
-          setOrder(data as Order);
+        // 2. Query remote database
+        try {
+          const { data } = await supabase
+            .from("orders")
+            .select("id, order_number, customer_name, phone, city, address, items, subtotal, delivery_charges, discount, total_amount, payment_method, status, created_at")
+            .eq("order_number", orderId)
+            .maybeSingle();
+
+          if (data) {
+            setOrder(data as Order);
+          }
+        } catch {
+          // ignore
         }
       }
       setLoading(false);
