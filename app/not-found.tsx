@@ -8,19 +8,32 @@ import { Home, ShoppingBag, Loader2 } from "lucide-react";
 export default function NotFound() {
   const router = useRouter();
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [redirectMessage, setRedirectMessage] = useState("Redirecting...");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const path = window.location.pathname;
       if (path.includes("/order-confirmation")) {
         setIsRedirecting(true);
+        setRedirectMessage("Finalizing Your Order Confirmation...");
         const parts = path.split("/").filter(Boolean);
         const orderId = parts.length > 1 ? parts[parts.length - 1] : "";
         const target =
           orderId && orderId !== "order-confirmation"
-            ? `/order-confirmation/?orderId=${orderId}`
+            ? `/order-confirmation/?orderId=${encodeURIComponent(orderId)}`
             : "/order-confirmation/";
         window.location.replace(target);
+        return;
+      }
+
+      if (path.startsWith("/product/")) {
+        setIsRedirecting(true);
+        setRedirectMessage("Loading Product Details...");
+        const slug = path.replace(/^\/product\//, "").replace(/\/$/, "");
+        if (slug) {
+          window.location.replace(`/product/?slug=${encodeURIComponent(slug)}`);
+          return;
+        }
       }
     }
   }, [router]);
@@ -29,7 +42,7 @@ export default function NotFound() {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 py-16 text-center space-y-4">
         <Loader2 className="w-10 h-10 text-brand-pink animate-spin mx-auto" />
-        <h2 className="text-base font-bold text-slate-800">Finalizing Your Order Confirmation...</h2>
+        <h2 className="text-base font-bold text-slate-800">{redirectMessage}</h2>
       </div>
     );
   }

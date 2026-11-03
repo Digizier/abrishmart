@@ -71,6 +71,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         selected_color: color,
         thumbnail_url: product.thumbnail_url,
         product_id: product.id,
+        hhc_product_id: product.hhc_product_id,
+        hhc_store_id: product.hhc_store_id,
       };
       return [...prev, newItem];
     });

@@ -47,6 +47,8 @@ export interface Product {
     colors?: string[];
   };
   sku?: string;
+  hhc_product_id?: number;
+  hhc_store_id?: number;
   created_at?: string;
 }
 
@@ -59,6 +61,8 @@ export interface OrderItem {
   selected_color?: string;
   thumbnail_url: string;
   product_id: string | number;
+  hhc_product_id?: number;
+  hhc_store_id?: number;
 }
 
 export interface Order {

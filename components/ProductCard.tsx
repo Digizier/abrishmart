@@ -37,7 +37,7 @@ export default function ProductCard({ product, onQuickOrder, onAddToCart }: Prod
 
       {/* Product Image Link */}
       <Link
-        href={`/product/${product.slug}`}
+        href={`/product/?slug=${encodeURIComponent(product.slug)}`}
         className="relative aspect-square w-full bg-slate-50 overflow-hidden block"
       >
         <Image
@@ -68,7 +68,7 @@ export default function ProductCard({ product, onQuickOrder, onAddToCart }: Prod
           </div>
 
           {/* Product Title - Strict 2-line clamp */}
-          <Link href={`/product/${product.slug}`}>
+          <Link href={`/product/?slug=${encodeURIComponent(product.slug)}`}>
             <h3 className="text-xs sm:text-sm font-semibold text-slate-900 line-clamp-2 hover:text-brand-pink transition leading-snug">
               {product.title}
             </h3>

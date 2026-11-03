@@ -341,6 +341,8 @@ export default function AdminPage() {
         is_featured: true,
         is_flash_deal: false,
         sku: item.sku || `HHC-${item.id}`,
+        hhc_product_id: item.id,
+        hhc_store_id: item.storeID,
       };
 
       const res = await adminSaveProduct(newProduct);
@@ -378,12 +380,19 @@ export default function AdminPage() {
         address: order.address,
         city: order.city,
         totalAmount: order.total_amount,
-        items: (order.items || []).map((it) => ({
-          id: it.id,
-          title: it.title,
-          quantity: it.quantity,
-          price: it.price,
-        })),
+        items: (order.items || []).map((it) => {
+          const matched = products.find(
+            (p) => String(p.id) === String(it.product_id) || p.title === it.title || p.sku === it.title
+          );
+          return {
+            id: it.id,
+            hhcProductId: it.hhc_product_id || matched?.hhc_product_id,
+            storeId: it.hhc_store_id || matched?.hhc_store_id,
+            title: it.title,
+            quantity: it.quantity,
+            price: it.price,
+          };
+        }),
         courierId,
       });
 
@@ -2195,10 +2204,17 @@ export default function AdminPage() {
                             <td className="p-3.5">
                               {isDispatched ? (
                                 <div className="space-y-0.5">
-                                  <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full text-[10px] inline-flex items-center gap-1">
-                                    <CheckCircle2 className="w-3 h-3" />
-                                    Dispatched to HHC
-                                  </span>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full text-[10px] inline-flex items-center gap-1">
+                                      <CheckCircle2 className="w-3 h-3" />
+                                      Dispatched to HHC
+                                    </span>
+                                    {ord.hhc_order_id && (
+                                      <span className="bg-blue-100 text-blue-800 font-black px-1.5 py-0.5 rounded text-[10px]">
+                                        HHC #{ord.hhc_order_id}
+                                      </span>
+                                    )}
+                                  </div>
                                   <p className="text-[10px] font-mono text-slate-500">
                                     {ord.tracking_number} ({ord.courier_name || "Trax"})
                                   </p>

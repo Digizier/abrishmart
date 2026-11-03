@@ -123,6 +123,8 @@ export default function QuickCheckoutModal({
       selected_color: selectedColor,
       thumbnail_url: product.thumbnail_url,
       product_id: product.id,
+      hhc_product_id: product.hhc_product_id,
+      hhc_store_id: product.hhc_store_id,
     };
 
     const res = await createOrder({
@@ -146,7 +148,7 @@ export default function QuickCheckoutModal({
 
     if (res.success && res.order_number) {
       onClose();
-      router.push(`/order-confirmation/${res.order_number}`);
+      router.push(`/order-confirmation/?orderId=${res.order_number}`);
     } else {
       setErrorMessage(res.error || "Failed to confirm order. Please try again.");
     }

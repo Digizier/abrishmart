@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Phone, Mail, MapPin, ShieldCheck, Truck, Headphones, RotateCcw } from "lucide-react";
 
 export default function Footer() {
@@ -51,9 +52,17 @@ export default function Footer() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
           {/* Column 1: Store Intro */}
           <div className="space-y-3">
-            <h3 className="text-white font-black text-sm uppercase tracking-wider">
-              Abrish Mart
-            </h3>
+            <Link href="/" className="inline-block">
+              <div className="relative h-11 w-44">
+                <Image
+                  src="/images/logo/logo-text.png"
+                  alt="Abrish Mart"
+                  fill
+                  className="object-contain object-left brightness-110"
+                  unoptimized
+                />
+              </div>
+            </Link>
             <p className="text-slate-400 text-xs leading-relaxed">
               Your trusted multi-category Pakistani online shopping destination. Delivering premium bridal silk nightwear, educational toys, watches, and smart lifestyle products at unbeatable prices.
             </p>

@@ -38,7 +38,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
       {!isAdmin && <AnnouncementBar />}
       {!isAdmin && <Header onOpenCart={openCart} cartCount={cartCount} />}
 
-      <main className="flex-1 pb-16 md:pb-0">{children}</main>
+      <main className="flex-1 pb-20 md:pb-0">{children}</main>
 
       {!isAdmin && <Footer />}
       {!isAdmin && <MobileBottomNav onOpenCart={openCart} cartCount={cartCount} />}

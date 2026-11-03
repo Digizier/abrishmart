@@ -695,22 +695,42 @@ export async function getProducts(options?: {
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
+  const cleanSlug = decodeURIComponent(slug || "").trim();
+  if (!cleanSlug) return null;
+
   try {
     const { data, error } = await supabase
       .from("products")
       .select(
-        "id, title, slug, description, price, original_price, wholesale_price, stock, thumbnail_url, gallery_urls, category_slug, subcategory_slug, child_subcategory_slug, is_active, is_featured, is_flash_deal, rating, reviews_count, variations, sku, created_at"
+        "id, title, slug, description, price, original_price, wholesale_price, stock, thumbnail_url, gallery_urls, category_slug, subcategory_slug, child_subcategory_slug, is_active, is_featured, is_flash_deal, rating, reviews_count, variations, sku, hhc_product_id, hhc_store_id, created_at"
       )
-      .eq("slug", slug)
+      .eq("slug", cleanSlug)
       .maybeSingle();
 
-    if (error || !data) {
-      const match = getStoredProducts().find((p) => p.slug === slug);
-      return match || null;
+    if (!error && data) {
+      return data as Product;
     }
-    return data as Product;
+
+    const prods = getStoredProducts();
+    const match = prods.find(
+      (p) =>
+        p.slug === cleanSlug ||
+        p.slug === slug ||
+        String(p.id) === String(cleanSlug) ||
+        (p.sku && p.sku.toLowerCase() === cleanSlug.toLowerCase()) ||
+        (p.hhc_product_id && String(p.hhc_product_id) === String(cleanSlug))
+    );
+    return match || null;
   } catch {
-    const match = getStoredProducts().find((p) => p.slug === slug);
+    const prods = getStoredProducts();
+    const match = prods.find(
+      (p) =>
+        p.slug === cleanSlug ||
+        p.slug === slug ||
+        String(p.id) === String(cleanSlug) ||
+        (p.sku && p.sku.toLowerCase() === cleanSlug.toLowerCase()) ||
+        (p.hhc_product_id && String(p.hhc_product_id) === String(cleanSlug))
+    );
     return match || null;
   }
 }

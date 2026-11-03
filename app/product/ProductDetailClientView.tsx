@@ -86,7 +86,7 @@ export default function ProductDetailClientView({ slug }: { slug: string }) {
 
   const imagesList = Array.from(new Set([product.thumbnail_url, ...(product.gallery_urls || [])].filter(Boolean)));
 
-  const productUrl = typeof window !== "undefined" ? window.location.href : `https://abrishmart.store/product/${product.slug}`;
+  const productUrl = typeof window !== "undefined" ? window.location.href : `https://abrishmart.store/product/?slug=${product.slug}`;
   const whatsappShareText = encodeURIComponent(
     `Check out ${product.title} on Abrish Mart for Rs. ${product.price.toLocaleString()}: ${productUrl}`
   );

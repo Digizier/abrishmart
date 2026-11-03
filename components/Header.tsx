@@ -116,12 +116,12 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
 
           {/* Logo with Text */}
           <Link href="/" className="flex items-center gap-2 shrink-0">
-            <div className="relative h-10 sm:h-12 w-36 sm:w-44">
+            <div className="relative h-11 sm:h-14 w-44 sm:w-56">
               <Image
                 src="/images/logo/logo-text.png"
                 alt="Abrish Mart"
                 fill
-                sizes="(max-width: 640px) 144px, 176px"
+                sizes="(max-width: 640px) 176px, 224px"
                 className="object-contain object-left"
                 priority
                 unoptimized
@@ -152,7 +152,7 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
                     {searchResults.map((item) => (
                       <Link
                         key={item.id}
-                        href={`/product/${item.slug}`}
+                        href={`/product/?slug=${encodeURIComponent(item.slug)}`}
                         onClick={() => setShowSearchDropdown(false)}
                         className="flex items-center gap-3 p-3 hover:bg-brand-softPink transition group"
                       >
