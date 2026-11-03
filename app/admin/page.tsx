@@ -391,6 +391,7 @@ export default function AdminPage() {
             title: it.title,
             quantity: it.quantity,
             price: it.price,
+            sku: matched?.sku,
           };
         }),
         courierId,

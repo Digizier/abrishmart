@@ -15,11 +15,48 @@ import {
   CheckCircle2,
   Home,
   MessageCircle,
+  Sparkles,
+  FileText,
+  Check,
 } from "lucide-react";
 import { Product } from "@/lib/types";
 import { getProductBySlug, getProducts } from "@/lib/db";
 import { useCart } from "@/context/CartContext";
 import ProductCard from "@/components/ProductCard";
+
+// Helpers to clean and parse HHC & Quill rich HTML safely
+function cleanHtmlDescription(rawHtml: string): string {
+  if (!rawHtml) return "";
+  return rawHtml
+    .replace(/<span class=["']ql-ui["'][^>]*>.*?<\/span>/gi, "")
+    .replace(/<span[^>]*class=["']ql-[^"']*["'][^>]*>.*?<\/span>/gi, "")
+    .replace(/<h[1-6]>\s*(<br\s*\/?>)?\s*<\/h[1-6]>/gi, "")
+    .replace(/<p>\s*(<br\s*\/?>)?\s*<\/p>/gi, "")
+    .replace(/data-list=["'][^"']*["']/gi, "")
+    .trim();
+}
+
+function extractPlainTextExcerpt(rawHtml: string, maxLen: number = 220): string {
+  if (!rawHtml) return "";
+  const firstP = rawHtml.match(/<p>([\s\S]*?)<\/p>/i);
+  const source = firstP ? firstP[1] : rawHtml;
+  const stripped = source.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+  if (stripped.length <= maxLen) return stripped;
+  return stripped.slice(0, maxLen).trim() + "...";
+}
+
+function extractFeatureBulletPoints(rawHtml: string): string[] {
+  if (!rawHtml) return [];
+  const matches = rawHtml.match(/<li[^>]*>([\s\S]*?)<\/li>/gi);
+  if (!matches) return [];
+  return matches
+    .map((li) => li.replace(/<[^>]+>/g, "").trim())
+    .filter((t) => t.length > 2);
+}
+
+function isHtmlContent(str: string): boolean {
+  return /<[a-z][\s\S]*>/i.test(str || "");
+}
 
 export default function ProductDetailClientView({ slug }: { slug: string }) {
   const { openQuickCheckout, addToCart } = useCart();
@@ -83,6 +120,11 @@ export default function ProductDetailClientView({ slug }: { slug: string }) {
     product.original_price && product.original_price > product.price
       ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
       : null;
+
+  const isHtml = isHtmlContent(product.description);
+  const cleanHtml = cleanHtmlDescription(product.description);
+  const bulletFeatures = extractFeatureBulletPoints(product.description);
+  const plainExcerpt = extractPlainTextExcerpt(product.description);
 
   const imagesList = Array.from(new Set([product.thumbnail_url, ...(product.gallery_urls || [])].filter(Boolean)));
 
@@ -190,10 +232,20 @@ export default function ProductDetailClientView({ slug }: { slug: string }) {
             </div>
           </div>
 
-          {/* Short Description */}
-          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed border-y border-slate-100 py-3">
-            {product.description}
-          </p>
+          {/* Product Summary / Excerpt */}
+          <div className="border-y border-slate-100 py-3.5 space-y-2">
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              {isHtml ? plainExcerpt : product.description}
+            </p>
+            {isHtml && (
+              <a
+                href="#product-details"
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-brand-pink hover:text-brand-pinkHover hover:underline transition"
+              >
+                <span>Full specifications & key features below ↓</span>
+              </a>
+            )}
+          </div>
 
           {/* Variations: Size Selector */}
           {product.variations?.sizes && product.variations.sizes.length > 0 && (
@@ -351,6 +403,93 @@ export default function ProductDetailClientView({ slug }: { slug: string }) {
           </div>
         </div>
       </div>
+
+      {/* ========================================================
+          FULL SPECIFICATIONS & KEY FEATURES SECTION
+      ======================================================== */}
+      <section id="product-details" className="pt-8 sm:pt-12 border-t border-slate-200">
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
+          <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+            <div className="w-10 h-10 rounded-2xl bg-brand-softPink flex items-center justify-center text-brand-pink shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-xl font-black text-slate-900">
+                Product Details & Specifications
+              </h2>
+              <p className="text-xs text-slate-500">
+                100% genuine product with open-parcel Cash on Delivery verification across Pakistan
+              </p>
+            </div>
+          </div>
+
+          {/* Key Feature Cards */}
+          {bulletFeatures.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>Key Features & Highlights</span>
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {bulletFeatures.map((feat, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-700 font-medium hover:bg-pink-50/40 transition"
+                  >
+                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">
+                      ✓
+                    </span>
+                    <span className="leading-snug">{feat}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Clean Rich Description Content */}
+          <div className="space-y-3 pt-2">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+              <FileText className="w-4 h-4 text-slate-600" />
+              <span>Full Overview</span>
+            </h3>
+            {isHtml ? (
+              <div
+                className="prose prose-sm max-w-none text-slate-600 text-xs sm:text-sm leading-relaxed space-y-3 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:text-slate-900 [&_p]:mb-2.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1.5 [&_li]:leading-normal [&_strong]:font-bold [&_strong]:text-slate-900"
+                dangerouslySetInnerHTML={{ __html: cleanHtml }}
+              />
+            ) : (
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed whitespace-pre-line">
+                {product.description}
+              </p>
+            )}
+          </div>
+
+          {/* Customer Assurance Strip */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-100">
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3">
+              <Truck className="w-5 h-5 text-brand-pink shrink-0" />
+              <div className="text-xs">
+                <p className="font-bold text-slate-900">Nationwide Delivery</p>
+                <p className="text-[11px] text-slate-500">2-4 Days via Trax & Leopard</p>
+              </div>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3">
+              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+              <div className="text-xs">
+                <p className="font-bold text-slate-900">Open Parcel Allowed</p>
+                <p className="text-[11px] text-slate-500">Inspect before paying courier</p>
+              </div>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3">
+              <Phone className="w-5 h-5 text-sky-600 shrink-0" />
+              <div className="text-xs">
+                <p className="font-bold text-slate-900">Dedicated Support</p>
+                <p className="text-[11px] text-slate-500">WhatsApp: 0345-2086160</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Related Products */}
       {related.length > 0 && (

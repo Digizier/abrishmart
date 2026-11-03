@@ -962,6 +962,12 @@ export async function adminSaveProduct(product: Partial<Product>): Promise<{ suc
       reviews_count: product.reviews_count || 12,
       variations: product.variations || {},
       sku: product.sku || "",
+      hhc_product_id:
+        product.hhc_product_id ||
+        (product.sku && /hhc/i.test(product.sku)
+          ? parseInt(product.sku.replace(/\D/g, ""), 10) || undefined
+          : undefined),
+      hhc_store_id: product.hhc_store_id,
       created_at: product.created_at || new Date().toISOString(),
     };
 
