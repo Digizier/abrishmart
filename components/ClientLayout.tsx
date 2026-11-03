@@ -30,7 +30,17 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
   // FIX: Page opens from the bottom bug fix -> Always restore scroll to top instantly on route change
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    const scrollToTop = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+    };
+
+    scrollToTop();
+    // Fire on next animation frame and 60ms delay to catch async hydration
+    requestAnimationFrame(scrollToTop);
+    const timer = setTimeout(scrollToTop, 60);
+    return () => clearTimeout(timer);
   }, [pathname]);
 
   return (

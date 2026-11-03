@@ -842,6 +842,7 @@ export async function createOrder(orderPayload: Omit<Order, "id" | "created_at">
           subtotal: orderPayload.subtotal,
           delivery_charges: orderPayload.delivery_charges,
           discount: orderPayload.discount,
+          discount_code: orderPayload.discount_code || null,
           total_amount: orderPayload.total_amount,
           payment_method: orderPayload.payment_method,
           payment_status: orderPayload.payment_status,
@@ -901,39 +902,290 @@ export async function getSiteSettings(): Promise<SiteSettings> {
   }
 }
 
-export async function getBanners(): Promise<Banner[]> {
+export const INITIAL_BANNERS: Banner[] = [
+  {
+    id: 1,
+    title: "Abrish Mart Special Offers - Shop Smart, Save More!",
+    image_url: "/images/banners/hero-banner.png",
+    link_url: "/shop",
+    is_active: true,
+    sort_order: 1,
+  },
+];
+
+export function getStoredBanners(): Banner[] {
+  if (typeof window === "undefined") return INITIAL_BANNERS;
   try {
-    const { data, error } = await supabase
+    const raw = localStorage.getItem("abm_stored_banners");
+    if (!raw) return INITIAL_BANNERS;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_BANNERS;
+  } catch {
+    return INITIAL_BANNERS;
+  }
+}
+
+export function setStoredBanners(banners: Banner[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("abm_stored_banners", JSON.stringify(banners));
+    window.dispatchEvent(new CustomEvent("kb_banners_updated", { detail: banners }));
+  } catch {}
+}
+
+export async function getBanners(includeInactive = false): Promise<Banner[]> {
+  const localBanners = getStoredBanners();
+  try {
+    let query = supabase
       .from("banners")
       .select("id, title, image_url, link_url, is_active, sort_order")
-      .eq("is_active", true)
       .order("sort_order", { ascending: true });
-
-    if (error || !data || data.length === 0) {
-      return [
-        {
-          id: 1,
-          title: "Abrish Mart Special Offers",
-          image_url: "/images/banners/hero-banner.png",
-          link_url: "/shop",
-          is_active: true,
-          sort_order: 1,
-        },
-      ];
+    if (!includeInactive) {
+      query = query.eq("is_active", true);
     }
-    return data as Banner[];
-  } catch {
-    return [
-      {
-        id: 1,
-        title: "Abrish Mart Special Offers",
-        image_url: "/images/banners/hero-banner.png",
-        link_url: "/shop",
-        is_active: true,
-        sort_order: 1,
-      },
-    ];
+    const { data, error } = await query;
+    if (!error && data && data.length > 0) {
+      const remoteBanners = data as Banner[];
+      const map = new Map<string, Banner>();
+      remoteBanners.forEach((b) => map.set(String(b.id), b));
+      localBanners.forEach((b) => {
+        if (!map.has(String(b.id))) map.set(String(b.id), b);
+      });
+      const combined = Array.from(map.values()).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      setStoredBanners(combined);
+      return includeInactive ? combined : combined.filter((b) => b.is_active);
+    }
+  } catch {}
+  return includeInactive ? localBanners : localBanners.filter((b) => b.is_active);
+}
+
+export async function adminSaveBanner(banner: Partial<Banner>): Promise<{ success: boolean; banner?: Banner; error?: string }> {
+  try {
+    const banners = getStoredBanners();
+    const id = banner.id || `BAN-${Date.now()}`;
+    const cleanBanner: Banner = {
+      id,
+      title: banner.title || "Promotional Banner",
+      image_url: banner.image_url || "/images/banners/hero-banner.png",
+      link_url: banner.link_url || "/shop",
+      is_active: banner.is_active ?? true,
+      sort_order: banner.sort_order ?? (banners.length + 1),
+    };
+
+    const idx = banners.findIndex((b) => String(b.id) === String(id));
+    if (idx >= 0) {
+      banners[idx] = { ...banners[idx], ...cleanBanner };
+    } else {
+      banners.push(cleanBanner);
+    }
+    setStoredBanners(banners);
+
+    // Sync to Supabase in non-blocking way
+    try {
+      await supabase.from("banners").upsert([
+        {
+          id: typeof id === "number" ? id : undefined,
+          title: cleanBanner.title,
+          image_url: cleanBanner.image_url,
+          link_url: cleanBanner.link_url,
+          is_active: cleanBanner.is_active,
+          sort_order: cleanBanner.sort_order,
+        },
+      ]);
+    } catch {}
+
+    return { success: true, banner: cleanBanner };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Banner save failed";
+    return { success: false, error: msg };
   }
+}
+
+export async function adminDeleteBanner(id: string | number): Promise<{ success: boolean; error?: string }> {
+  try {
+    const banners = getStoredBanners().filter((b) => String(b.id) !== String(id));
+    setStoredBanners(banners);
+
+    try {
+      await supabase.from("banners").delete().eq("id", id);
+    } catch {}
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Banner deletion failed";
+    return { success: false, error: msg };
+  }
+}
+
+// ==========================================
+// COUPONS & DISCOUNTS SYSTEM (HYBRID DUAL-TIER)
+// ==========================================
+export const INITIAL_COUPONS: Coupon[] = [
+  {
+    id: 1,
+    code: "WELCOME200",
+    discount_type: "fixed",
+    discount_value: 200,
+    min_spend: 1500,
+    free_shipping: false,
+    is_active: true,
+  },
+  {
+    id: 2,
+    code: "ABRISH10",
+    discount_type: "percentage",
+    discount_value: 10,
+    min_spend: 2000,
+    free_shipping: false,
+    is_active: true,
+  },
+  {
+    id: 3,
+    code: "FREESHIP",
+    discount_type: "fixed",
+    discount_value: 200,
+    min_spend: 2500,
+    free_shipping: true,
+    is_active: true,
+  },
+];
+
+export function getStoredCoupons(): Coupon[] {
+  if (typeof window === "undefined") return INITIAL_COUPONS;
+  try {
+    const raw = localStorage.getItem("abm_stored_coupons");
+    if (!raw) return INITIAL_COUPONS;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_COUPONS;
+  } catch {
+    return INITIAL_COUPONS;
+  }
+}
+
+export function setStoredCoupons(coupons: Coupon[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("abm_stored_coupons", JSON.stringify(coupons));
+    window.dispatchEvent(new CustomEvent("kb_coupons_updated", { detail: coupons }));
+  } catch {}
+}
+
+export async function getCoupons(): Promise<Coupon[]> {
+  const localList = getStoredCoupons();
+  try {
+    const { data, error } = await supabase.from("coupons").select("*");
+    if (!error && data && data.length > 0) {
+      const remoteCoupons = data as Coupon[];
+      const map = new Map<string, Coupon>();
+      remoteCoupons.forEach((c) => map.set(c.code.toUpperCase(), c));
+      localList.forEach((c) => {
+        if (!map.has(c.code.toUpperCase())) map.set(c.code.toUpperCase(), c);
+      });
+      const combined = Array.from(map.values());
+      setStoredCoupons(combined);
+      return combined;
+    }
+  } catch {}
+  return localList;
+}
+
+export async function adminSaveCoupon(coupon: Partial<Coupon>): Promise<{ success: boolean; coupon?: Coupon; error?: string }> {
+  try {
+    const code = (coupon.code || "").trim().toUpperCase();
+    if (!code) {
+      return { success: false, error: "Coupon code is required" };
+    }
+    const coupons = getStoredCoupons();
+    const id = coupon.id || `CPN-${Date.now()}`;
+    const cleanCoupon: Coupon = {
+      id,
+      code,
+      discount_type: coupon.discount_type || "fixed",
+      discount_value: Number(coupon.discount_value) || 0,
+      min_spend: Number(coupon.min_spend) || 0,
+      free_shipping: Boolean(coupon.free_shipping),
+      is_active: coupon.is_active ?? true,
+      created_at: coupon.created_at || new Date().toISOString(),
+    };
+
+    const idx = coupons.findIndex((c) => String(c.id) === String(id) || c.code.toUpperCase() === code);
+    if (idx >= 0) {
+      coupons[idx] = cleanCoupon;
+    } else {
+      coupons.unshift(cleanCoupon);
+    }
+    setStoredCoupons(coupons);
+
+    try {
+      await supabase.from("coupons").upsert([cleanCoupon]);
+    } catch {}
+
+    return { success: true, coupon: cleanCoupon };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Coupon save failed";
+    return { success: false, error: msg };
+  }
+}
+
+export async function adminDeleteCoupon(id: string | number): Promise<{ success: boolean; error?: string }> {
+  try {
+    const coupons = getStoredCoupons().filter((c) => String(c.id) !== String(id));
+    setStoredCoupons(coupons);
+
+    try {
+      await supabase.from("coupons").delete().eq("id", id);
+    } catch {}
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Coupon deletion failed";
+    return { success: false, error: msg };
+  }
+}
+
+export async function validateCoupon(
+  code: string,
+  subtotal: number
+): Promise<{ valid: boolean; message: string; discountAmount: number; freeShipping: boolean; coupon?: Coupon }> {
+  const cleanCode = (code || "").trim().toUpperCase();
+  if (!cleanCode) {
+    return { valid: false, message: "Please enter a coupon code.", discountAmount: 0, freeShipping: false };
+  }
+
+  const coupons = await getCoupons();
+  const found = coupons.find((c) => c.code.toUpperCase() === cleanCode);
+
+  if (!found) {
+    return { valid: false, message: `Coupon "${cleanCode}" is invalid.`, discountAmount: 0, freeShipping: false };
+  }
+
+  if (!found.is_active) {
+    return { valid: false, message: `Coupon "${cleanCode}" is inactive or expired.`, discountAmount: 0, freeShipping: false };
+  }
+
+  if (subtotal < (found.min_spend || 0)) {
+    return {
+      valid: false,
+      message: `Coupon "${cleanCode}" requires a minimum order value of Rs. ${(found.min_spend || 0).toLocaleString()}.`,
+      discountAmount: 0,
+      freeShipping: false,
+    };
+  }
+
+  let discountAmount = 0;
+  if (found.discount_type === "percentage") {
+    discountAmount = Math.round((subtotal * found.discount_value) / 100);
+  } else {
+    discountAmount = Math.min(found.discount_value, subtotal);
+  }
+
+  return {
+    valid: true,
+    message: `🎉 Coupon "${found.code}" applied! You saved Rs. ${discountAmount.toLocaleString()}.`,
+    discountAmount,
+    freeShipping: Boolean(found.free_shipping),
+    coupon: found,
+  };
 }
 
 // ==========================================

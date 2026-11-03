@@ -145,7 +145,7 @@ export default function ProductDetailClientView({ slug }: { slug: string }) {
           <span>Home</span>
         </Link>
         <span>/</span>
-        <Link href={`/category/${product.category_slug}`} className="hover:text-brand-pink capitalize">
+        <Link href={`/category/?slug=${product.category_slug}`} className="hover:text-brand-pink capitalize">
           {product.category_slug.replace(/-/g, " ")}
         </Link>
         <span>/</span>

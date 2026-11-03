@@ -77,6 +77,7 @@ export interface Order {
   subtotal: number;
   delivery_charges: number;
   discount: number;
+  discount_code?: string;
   total_amount: number;
   payment_method: "cod" | "jazzcash" | "easypaisa" | "bank";
   payment_status: "pending" | "verified" | "rejected";

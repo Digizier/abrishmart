@@ -83,17 +83,17 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/category/bridal-silk-nightwear" className="hover:text-brand-pink transition">
+                <Link href="/category/?slug=bridal-silk-nightwear" className="hover:text-brand-pink transition">
                   Bridal Silk & Nightwear
                 </Link>
               </li>
               <li>
-                <Link href="/category/kids-educational-toys" className="hover:text-brand-pink transition">
+                <Link href="/category/?slug=kids-educational-toys" className="hover:text-brand-pink transition">
                   Kids & Educational Toys
                 </Link>
               </li>
               <li>
-                <Link href="/category/fashion-watches" className="hover:text-brand-pink transition">
+                <Link href="/category/?slug=fashion-watches" className="hover:text-brand-pink transition">
                   Fashion Watches & Accessories
                 </Link>
               </li>

@@ -35,6 +35,16 @@ export default function NotFound() {
           return;
         }
       }
+
+      if (path.startsWith("/category/")) {
+        setIsRedirecting(true);
+        setRedirectMessage("Loading Category Collection...");
+        const slug = path.replace(/^\/category\//, "").replace(/\/$/, "");
+        if (slug) {
+          window.location.replace(`/category/?slug=${encodeURIComponent(slug)}`);
+          return;
+        }
+      }
     }
   }, [router]);
 

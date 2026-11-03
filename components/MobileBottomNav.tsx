@@ -18,16 +18,16 @@ export default function MobileBottomNav({ onOpenCart, cartCount = 0 }: MobileBot
   const isTrack = pathname === "/track-order";
 
   return (
-    <div className="fixed bottom-2.5 inset-x-3 z-40 md:hidden pb-[env(safe-area-inset-bottom)]">
+    <div className="fixed bottom-3 inset-x-3.5 z-40 md:hidden pb-[env(safe-area-inset-bottom)] pointer-events-none">
       <nav
         aria-label="Mobile Navigation"
-        className="bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.12)] px-1.5 py-1"
+        className="pointer-events-auto bg-white/95 backdrop-blur-2xl border border-slate-300/80 rounded-[28px] shadow-[0_14px_40px_rgba(0,0,0,0.16)] ring-1 ring-black/5 px-2 py-1.5 transition-all duration-200"
       >
         <div className="grid grid-cols-5 items-center h-14">
           {/* Home */}
           <Link
             href="/"
-            className={`flex flex-col items-center justify-center gap-0.5 py-1 px-1 rounded-xl transition-all duration-200 ${
+            className={`flex flex-col items-center justify-center gap-0.5 py-1 px-1 rounded-2xl transition-all duration-200 ${
               isHome
                 ? "text-brand-pink font-bold bg-pink-50/90 shadow-2xs scale-102"
                 : "text-slate-600 hover:text-brand-pink hover:bg-slate-50"
@@ -40,7 +40,7 @@ export default function MobileBottomNav({ onOpenCart, cartCount = 0 }: MobileBot
           {/* Shop / Categories */}
           <Link
             href="/shop"
-            className={`flex flex-col items-center justify-center gap-0.5 py-1 px-1 rounded-xl transition-all duration-200 ${
+            className={`flex flex-col items-center justify-center gap-0.5 py-1 px-1 rounded-2xl transition-all duration-200 ${
               isShop
                 ? "text-brand-pink font-bold bg-pink-50/90 shadow-2xs scale-102"
                 : "text-slate-600 hover:text-brand-pink hover:bg-slate-50"
@@ -54,7 +54,7 @@ export default function MobileBottomNav({ onOpenCart, cartCount = 0 }: MobileBot
           <button
             type="button"
             onClick={onOpenCart}
-            className="flex flex-col items-center justify-center gap-0.5 py-1 px-1 rounded-xl text-slate-600 hover:text-brand-pink hover:bg-slate-50 relative transition-all duration-200 group"
+            className="flex flex-col items-center justify-center gap-0.5 py-1 px-1 rounded-2xl text-slate-600 hover:text-brand-pink hover:bg-slate-50 relative transition-all duration-200 group"
             aria-label="Open Shopping Cart"
           >
             <div className="relative">
@@ -71,7 +71,7 @@ export default function MobileBottomNav({ onOpenCart, cartCount = 0 }: MobileBot
           {/* Track Order */}
           <Link
             href="/track-order"
-            className={`flex flex-col items-center justify-center gap-0.5 py-1 px-1 rounded-xl transition-all duration-200 ${
+            className={`flex flex-col items-center justify-center gap-0.5 py-1 px-1 rounded-2xl transition-all duration-200 ${
               isTrack
                 ? "text-brand-pink font-bold bg-pink-50/90 shadow-2xs scale-102"
                 : "text-slate-600 hover:text-brand-pink hover:bg-slate-50"
@@ -86,7 +86,7 @@ export default function MobileBottomNav({ onOpenCart, cartCount = 0 }: MobileBot
             href="https://wa.me/923452086160"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-col items-center justify-center gap-0.5 py-1 px-1 rounded-xl text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50/70 transition-all duration-200"
+            className="flex flex-col items-center justify-center gap-0.5 py-1 px-1 rounded-2xl text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50/70 transition-all duration-200"
           >
             <PhoneCall className="w-5 h-5 stroke-[2]" />
             <span className="text-[10px] tracking-tight font-semibold">WhatsApp</span>

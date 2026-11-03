@@ -4,9 +4,9 @@ import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Truck, ArrowLeft, CheckCircle2, AlertCircle, Home, Building2 } from "lucide-react";
+import { ShieldCheck, Truck, ArrowLeft, CheckCircle2, AlertCircle, Home, Building2, Tag, X } from "lucide-react";
 import { useCart } from "@/context/CartContext";
-import { createOrder } from "@/lib/db";
+import { createOrder, validateCoupon } from "@/lib/db";
 import { compressAndUploadImage } from "@/lib/image-compress";
 
 const CITIES = [
@@ -31,9 +31,44 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  // Promo Coupon States
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [isFreeShippingCoupon, setIsFreeShippingCoupon] = useState(false);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponMessage, setCouponMessage] = useState<{ text: string; isError: boolean } | null>(null);
+
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const deliveryCharges = subtotal >= 2500 || cart.length === 0 ? 0 : 200;
-  const grandTotal = subtotal + deliveryCharges;
+  const baseDelivery = subtotal >= 2500 || cart.length === 0 ? 0 : 200;
+  const deliveryCharges = isFreeShippingCoupon ? 0 : baseDelivery;
+  const grandTotal = Math.max(0, subtotal + deliveryCharges - discountAmount);
+
+  const handleApplyCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = couponCode.trim().toUpperCase();
+    if (!clean) return;
+    setCouponLoading(true);
+    setCouponMessage(null);
+    const res = await validateCoupon(clean, subtotal);
+    setCouponLoading(false);
+    if (res.valid) {
+      setAppliedCoupon(res.coupon?.code || clean);
+      setDiscountAmount(res.discountAmount);
+      setIsFreeShippingCoupon(res.freeShipping);
+      setCouponMessage({ text: res.message, isError: false });
+    } else {
+      setCouponMessage({ text: res.message, isError: true });
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setDiscountAmount(0);
+    setIsFreeShippingCoupon(false);
+    setCouponCode("");
+    setCouponMessage(null);
+  };
 
   if (cart.length === 0) {
     return (
@@ -75,7 +110,8 @@ export default function CheckoutPage() {
       items: cart,
       subtotal,
       delivery_charges: deliveryCharges,
-      discount: 0,
+      discount: discountAmount,
+      discount_code: appliedCoupon || undefined,
       total_amount: grandTotal,
       payment_method: paymentMethod,
       payment_status: paymentMethod === "cod" ? "pending" : "pending",
@@ -90,6 +126,7 @@ export default function CheckoutPage() {
       clearCart();
       if (typeof window !== "undefined") {
         sessionStorage.setItem("abm_last_order_id", orderRes.order_number);
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
       }
       router.push(`/order-confirmation/?orderId=${orderRes.order_number}`);
     } else {
@@ -319,6 +356,55 @@ export default function CheckoutPage() {
             ))}
           </div>
 
+          {/* Coupon / Voucher Code */}
+          <div className="pt-3 border-t border-slate-200">
+            {appliedCoupon ? (
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-emerald-600" />
+                  <span>
+                    Coupon <strong>{appliedCoupon}</strong> Applied (-Rs. {discountAmount.toLocaleString()})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemoveCoupon}
+                  className="p-1 text-slate-400 hover:text-rose-600 rounded transition"
+                  title="Remove coupon"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleApplyCoupon} className="space-y-1.5">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Tag className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value)}
+                      placeholder="Promo Code (e.g. WELCOME200)"
+                      className="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl uppercase font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-pink/20 focus:border-brand-pink"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={couponLoading || !couponCode.trim()}
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition disabled:opacity-50"
+                  >
+                    {couponLoading ? "..." : "Apply"}
+                  </button>
+                </div>
+                {couponMessage && (
+                  <p className={`text-[11px] font-medium ${couponMessage.isError ? "text-rose-600" : "text-emerald-600"}`}>
+                    {couponMessage.text}
+                  </p>
+                )}
+              </form>
+            )}
+          </div>
+
           <div className="pt-3 border-t border-slate-200 space-y-2 text-xs">
             <div className="flex justify-between text-slate-600">
               <span>Subtotal:</span>
@@ -334,6 +420,12 @@ export default function CheckoutPage() {
                 )}
               </span>
             </div>
+            {discountAmount > 0 && (
+              <div className="flex justify-between text-emerald-600 font-bold">
+                <span>Discount ({appliedCoupon}):</span>
+                <span>- Rs. {discountAmount.toLocaleString()}</span>
+              </div>
+            )}
             <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-sm font-black">
               <span className="text-slate-900">Total Payable:</span>
               <span className="text-brand-pink text-base font-black">Rs. {grandTotal.toLocaleString()}</span>

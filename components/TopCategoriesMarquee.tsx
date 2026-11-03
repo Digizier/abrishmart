@@ -90,7 +90,7 @@ export default function TopCategoriesMarquee({ categories }: TopCategoriesMarque
           {displayList.map((cat, idx) => (
             <Link
               key={`${cat.slug}-${idx}`}
-              href={`/category/${cat.slug}`}
+              href={`/category/?slug=${cat.slug}`}
               className="flex-shrink-0 w-[40vw] sm:w-48 lg:w-56 group bg-white rounded-2xl p-3 border border-slate-200/80 hover:border-brand-pink/40 hover:shadow-md transition-all duration-200 flex flex-col items-center text-center"
             >
               {/* Category Circle Image */}

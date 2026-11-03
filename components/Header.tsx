@@ -301,7 +301,7 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
                           }`}
                         >
                           <Link
-                            href={`/category/${cat.slug}`}
+                            href={`/category/?slug=${cat.slug}`}
                             onClick={() => setMegaMenuOpen(false)}
                             className="flex items-center gap-2.5 truncate flex-1"
                           >
@@ -328,7 +328,7 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
                             </p>
                           </div>
                           <Link
-                            href={`/category/${activeHoverCategory.slug}`}
+                            href={`/category/?slug=${activeHoverCategory.slug}`}
                             onClick={() => setMegaMenuOpen(false)}
                             className="text-xs font-bold text-brand-pink hover:underline flex items-center gap-1"
                           >
@@ -344,7 +344,7 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
                             {activeHoverCategory.subcategories.map((sub) => (
                               <div key={sub.id} className="space-y-2">
                                 <Link
-                                  href={`/category/${activeHoverCategory.slug}?sub=${sub.slug}`}
+                                  href={`/category/?slug=${activeHoverCategory.slug}&sub=${sub.slug}`}
                                   onClick={() => setMegaMenuOpen(false)}
                                   className="font-bold text-xs text-slate-900 hover:text-brand-pink block pb-1 border-b border-slate-100"
                                 >
@@ -357,7 +357,7 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
                                     {sub.child_subcategories.map((child) => (
                                       <Link
                                         key={child.id}
-                                        href={`/category/${activeHoverCategory.slug}?sub=${sub.slug}&child=${child.slug}`}
+                                        href={`/category/?slug=${activeHoverCategory.slug}&sub=${sub.slug}&child=${child.slug}`}
                                         onClick={() => setMegaMenuOpen(false)}
                                         className="text-[11px] text-slate-500 hover:text-brand-pink block py-0.5 hover:translate-x-1 transition-transform"
                                       >
@@ -373,7 +373,7 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
                           <div className="py-8 text-center text-slate-400 text-xs">
                             <p>Browse full catalog in {activeHoverCategory.name}</p>
                             <Link
-                              href={`/category/${activeHoverCategory.slug}`}
+                              href={`/category/?slug=${activeHoverCategory.slug}`}
                               onClick={() => setMegaMenuOpen(false)}
                               className="inline-block mt-3 px-4 py-2 bg-brand-softPink text-brand-pink font-bold rounded-xl text-xs"
                             >
@@ -401,7 +401,7 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
             {categories.slice(0, 4).map((cat) => (
               <Link
                 key={cat.id}
-                href={`/category/${cat.slug}`}
+                href={`/category/?slug=${cat.slug}`}
                 className="hover:text-brand-pink transition truncate max-w-[150px]"
               >
                 {cat.name}
@@ -433,7 +433,7 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
           MOBILE MENU DRAWER WITH ACCORDION SUB-CATEGORIES
       ========================================================= */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-b border-slate-200 px-4 py-4 space-y-3 shadow-lg animate-in fade-in duration-150 max-h-[80vh] overflow-y-auto">
+        <div className="md:hidden fixed inset-x-0 top-[57px] bottom-[80px] z-50 bg-white border-b border-slate-200 px-4 pt-4 pb-12 space-y-3 shadow-2xl overflow-y-auto overscroll-contain">
           {/* Flash Sale Banner on Mobile */}
           <Link
             href="/flash-deals"
@@ -479,7 +479,7 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
                   <div key={cat.id} className="border border-slate-100 rounded-xl overflow-hidden bg-slate-50/50">
                     <div className="flex items-center justify-between p-2.5">
                       <Link
-                        href={`/category/${cat.slug}`}
+                        href={`/category/?slug=${cat.slug}`}
                         onClick={() => setMobileMenuOpen(false)}
                         className="font-bold text-xs text-slate-900 hover:text-brand-pink flex-1"
                       >
@@ -510,7 +510,7 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
                             <div key={sub.id} className="pl-2 border-l-2 border-brand-softPink">
                               <div className="flex items-center justify-between">
                                 <Link
-                                  href={`/category/${cat.slug}?sub=${sub.slug}`}
+                                  href={`/category/?slug=${cat.slug}&sub=${sub.slug}`}
                                   onClick={() => setMobileMenuOpen(false)}
                                   className="text-xs font-semibold text-slate-800 hover:text-brand-pink"
                                 >
@@ -537,7 +537,7 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
                                   {sub.child_subcategories!.map((ch) => (
                                     <Link
                                       key={ch.id}
-                                      href={`/category/${cat.slug}?sub=${sub.slug}&child=${ch.slug}`}
+                                      href={`/category/?slug=${cat.slug}&sub=${sub.slug}&child=${ch.slug}`}
                                       onClick={() => setMobileMenuOpen(false)}
                                       className="block text-[11px] text-slate-500 hover:text-brand-pink py-0.5"
                                     >

@@ -5,12 +5,12 @@ import Link from "next/link";
 import { PackageSearch, Search, AlertCircle, CheckCircle2, Clock, Truck, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Order } from "@/lib/types";
+import { getOrderById } from "@/lib/db";
 
 const STATUS_STEPS = ["Pending", "Confirmed", "Processing", "Shipped", "Delivered"];
 
 export default function TrackOrderPage() {
   const [orderNumber, setOrderNumber] = useState("");
-  const [phone, setPhone] = useState("");
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -20,33 +20,34 @@ export default function TrackOrderPage() {
     setErrorMsg("");
     setOrder(null);
 
-    const cleanOrderNo = orderNumber.trim().toUpperCase();
-    const cleanPhone = phone.trim().replace(/[^0-9]/g, "");
-
-    if (!cleanOrderNo || !cleanPhone) {
-      setErrorMsg("Please enter both your Order Number and Mobile Number.");
+    const rawInput = orderNumber.trim();
+    if (!rawInput) {
+      setErrorMsg("Please enter your Order Number.");
       return;
     }
 
     setLoading(true);
 
     try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("id, order_number, customer_name, phone, city, address, items, subtotal, delivery_charges, total_amount, status, tracking_number, courier_name, created_at")
-        .eq("order_number", cleanOrderNo)
-        .maybeSingle();
+      const cleanOrderNo = rawInput.toUpperCase();
+      // Try getOrderById (searches local cache, last order, and Supabase)
+      const foundOrder = await getOrderById(cleanOrderNo);
 
-      if (error || !data) {
-        setErrorMsg("No matching order found. Please check your Order Number and Phone Number.");
+      if (foundOrder) {
+        setOrder(foundOrder);
       } else {
-        // Verify phone matches (last 4 digits match for privacy)
-        const dbPhone = data.phone?.replace(/[^0-9]/g, "");
-        if (dbPhone && !dbPhone.endsWith(cleanPhone.slice(-4))) {
-          setErrorMsg("Phone number does not match the order record.");
-        } else {
-          setOrder(data as Order);
+        // Fallback: check if user typed only the numeric part
+        const numericMatch = cleanOrderNo.replace(/[^0-9]/g, "");
+        if (numericMatch.length >= 4) {
+          const formatted = `ABM-${numericMatch}`;
+          const retryOrder = await getOrderById(formatted);
+          if (retryOrder) {
+            setOrder(retryOrder);
+            setLoading(false);
+            return;
+          }
         }
+        setErrorMsg(`No matching order found with number "${rawInput}". Please check your Order Number.`);
       }
     } catch {
       setErrorMsg("Failed to query order tracking. Please try again.");
@@ -67,41 +68,33 @@ export default function TrackOrderPage() {
           Track Your Abrish Mart Parcel
         </h1>
         <p className="text-xs sm:text-sm text-slate-600">
-          Enter your Order Number and Mobile Number to view live dispatch status across Pakistan.
+          Enter your Order Number to view live dispatch and courier tracking status across Pakistan.
         </p>
       </div>
 
       {/* Lookup Card */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
         <form onSubmit={handleTrack} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Order Number *
-              </label>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Order Number *
+            </label>
+            <div className="relative">
               <input
                 type="text"
                 required
                 value={orderNumber}
                 onChange={(e) => setOrderNumber(e.target.value)}
-                placeholder="e.g. ABM-849201"
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 uppercase focus:outline-none focus:ring-2 focus:ring-brand-pink/20 focus:border-brand-pink"
+                placeholder="e.g. ABM-438569 or 438569"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 uppercase font-semibold tracking-wide focus:outline-none focus:ring-2 focus:ring-brand-pink/20 focus:border-brand-pink"
               />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded">
+                COD ORDER
+              </span>
             </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Mobile Number *
-              </label>
-              <input
-                type="tel"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="03451234567"
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-pink/20 focus:border-brand-pink"
-              />
-            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              You can find your order reference number on your confirmation receipt or SMS / WhatsApp message.
+            </p>
           </div>
 
           {errorMsg && (
@@ -179,6 +172,24 @@ export default function TrackOrderPage() {
             <p><strong>Customer:</strong> {order.customer_name}</p>
             <p><strong>Destination:</strong> {order.address}, {order.city}</p>
             <p><strong>Total Payable:</strong> Rs. {order.total_amount?.toLocaleString()} (Cash on Delivery)</p>
+
+            {order.items && order.items.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-slate-100">
+                <p className="font-bold text-slate-700 mb-2">Ordered Items ({order.items.length}):</p>
+                <div className="space-y-1.5">
+                  {order.items.map((it, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-slate-50 p-2 rounded-lg text-slate-600">
+                      <span className="truncate max-w-[240px] sm:max-w-md font-medium text-slate-800">
+                        {it.title} × {it.quantity}
+                      </span>
+                      <span className="font-bold text-brand-pink shrink-0">
+                        Rs. {(it.price * it.quantity).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

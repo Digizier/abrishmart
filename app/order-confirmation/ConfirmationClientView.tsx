@@ -12,6 +12,10 @@ export default function ConfirmationClientView({ orderId }: { orderId: string })
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+
     async function fetchOrder() {
       if (orderId && orderId !== "ABM-SUCCESS") {
         const found = await getOrderById(orderId);

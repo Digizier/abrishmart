@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { X, ShieldCheck, Truck, Tag, CheckCircle2, AlertCircle } from "lucide-react";
 import { Product, OrderItem } from "@/lib/types";
-import { createOrder } from "@/lib/db";
+import { createOrder, validateCoupon } from "@/lib/db";
 
 interface QuickCheckoutModalProps {
   isOpen: boolean;
@@ -70,24 +70,18 @@ export default function QuickCheckoutModal({
   const totalPayable = Math.max(0, subtotal + deliveryCharges - discount);
 
   // Apply Promo Coupon
-  const handleApplyCoupon = (e: React.FormEvent) => {
+  const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = couponCode.trim().toUpperCase();
     if (!cleanCode) return;
 
-    if (cleanCode === "SAVE500" && subtotal >= 3000) {
-      setDiscount(500);
-      setCouponMessage("🎉 Coupon SAVE500 applied! Rs. 500 off.");
-    } else if (cleanCode === "FREESHIP") {
-      setDiscount(200);
-      setCouponMessage("🎉 Coupon FREESHIP applied! Free Delivery.");
-    } else if (cleanCode === "ABRISH10") {
-      const disc = Math.round(subtotal * 0.1);
-      setDiscount(disc);
-      setCouponMessage(`🎉 Coupon ABRISH10 applied! Rs. ${disc} off.`);
+    const res = await validateCoupon(cleanCode, subtotal);
+    if (res.valid) {
+      setDiscount(res.discountAmount);
+      setCouponMessage(res.message);
     } else {
       setDiscount(0);
-      setCouponMessage("❌ Invalid coupon code or minimum spend requirement not met.");
+      setCouponMessage(`❌ ${res.message}`);
     }
   };
 
@@ -137,6 +131,7 @@ export default function QuickCheckoutModal({
       subtotal,
       delivery_charges: deliveryCharges,
       discount,
+      discount_code: discount > 0 ? couponCode.trim().toUpperCase() : undefined,
       total_amount: totalPayable,
       payment_method: "cod",
       payment_status: "pending",

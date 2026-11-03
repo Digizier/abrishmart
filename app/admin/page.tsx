@@ -39,13 +39,15 @@ import {
   X,
   Tag,
   FolderPlus,
+  Upload,
 } from "lucide-react";
-import { Product, Category, Order, Banner, SiteSettings } from "@/lib/types";
+import { Product, Category, Order, Banner, SiteSettings, Coupon } from "@/lib/types";
 import {
   getProducts,
   getCategories,
   getOrders,
   getBanners,
+  getCoupons,
   getSiteSettings,
   adminSaveProduct,
   adminDeleteProduct,
@@ -54,6 +56,10 @@ import {
   adminAddSubcategory,
   adminAddChildSubcategory,
   adminDeleteSubcategory,
+  adminSaveBanner,
+  adminDeleteBanner,
+  adminSaveCoupon,
+  adminDeleteCoupon,
   adminUpdateOrderStatus,
   adminUpdateOrderHhcDispatch,
   adminSaveSettings,
@@ -90,12 +96,13 @@ export default function AdminPage() {
   const [pinInput, setPinInput] = useState("");
   const [authError, setAuthError] = useState("");
 
-  // Navigation Hubs: 'products' | 'categories' | 'orders' | 'banners' | 'settings' | 'hhc-*'
+  // Navigation Hubs: 'products' | 'categories' | 'orders' | 'banners' | 'coupons' | 'settings' | 'hhc-*'
   const [activeTab, setActiveTab] = useState<
     | "products"
     | "categories"
     | "orders"
     | "banners"
+    | "coupons"
     | "settings"
     | "hhc-overview"
     | "hhc-importer"
@@ -110,6 +117,7 @@ export default function AdminPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
 
   // Auto-sync 30s toggle
@@ -124,9 +132,15 @@ export default function AdminPage() {
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Partial<Category> | null>(null);
 
+  const [bannerModalOpen, setBannerModalOpen] = useState(false);
+  const [editingBanner, setEditingBanner] = useState<Partial<Banner> | null>(null);
+
+  const [couponModalOpen, setCouponModalOpen] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState<Partial<Coupon> | null>(null);
+
   const [deleteConfirm, setDeleteConfirm] = useState<{
     open: boolean;
-    type: "product" | "category" | "banner";
+    type: "product" | "category" | "banner" | "coupon";
     id: string | number;
     title: string;
   } | null>(null);
@@ -211,20 +225,20 @@ export default function AdminPage() {
   const loadData = async (silent: boolean = false) => {
     if (!silent) setIsRefreshing(true);
     try {
-      const [prodRes, cats, bans, setts] = await Promise.all([
+      const [prodRes, cats, bans, setts, coups, ords] = await Promise.all([
         getProducts({ limit: 100 }),
         getCategories(),
-        getBanners(),
+        getBanners(true),
         getSiteSettings(),
+        getCoupons(),
+        getOrders(),
       ]);
 
       setProducts(prodRes.products);
       setCategories(cats);
       setBanners(bans);
       setSettings(setts);
-
-      // Fetch orders using dual-tier hybrid persistence (remote + local cache)
-      const ords = await getOrders();
+      setCoupons(coups);
       setOrders(ords);
     } catch (err) {
       console.warn("Admin fetch error:", err);
@@ -237,14 +251,25 @@ export default function AdminPage() {
     if (isAuthenticated) {
       loadData();
 
-      // Listen for instant real-time order updates
+      // Listen for instant real-time order, banner, coupon updates
       const handleOrdersUpdate = () => {
         getOrders().then((ords) => setOrders(ords));
       };
+      const handleBannersUpdate = () => {
+        getBanners(true).then((b) => setBanners(b));
+      };
+      const handleCouponsUpdate = () => {
+        getCoupons().then((c) => setCoupons(c));
+      };
+
       window.addEventListener("kb_orders_updated", handleOrdersUpdate);
+      window.addEventListener("kb_banners_updated", handleBannersUpdate);
+      window.addEventListener("kb_coupons_updated", handleCouponsUpdate);
       window.addEventListener("storage", handleOrdersUpdate);
       return () => {
         window.removeEventListener("kb_orders_updated", handleOrdersUpdate);
+        window.removeEventListener("kb_banners_updated", handleBannersUpdate);
+        window.removeEventListener("kb_coupons_updated", handleCouponsUpdate);
         window.removeEventListener("storage", handleOrdersUpdate);
       };
     }
@@ -706,9 +731,70 @@ export default function AdminPage() {
     } else if (type === "category") {
       await adminDeleteCategory(id);
       showToast("✅ Category deleted permanently.");
+    } else if (type === "banner") {
+      await adminDeleteBanner(id);
+      showToast("✅ Banner deleted permanently.");
+    } else if (type === "coupon") {
+      await adminDeleteCoupon(id);
+      showToast("✅ Coupon removed permanently.");
     }
     setDeleteConfirm(null);
     loadData(false);
+  };
+
+  // Save banner handler
+  const handleSaveBanner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBanner?.image_url) {
+      showToast("Please provide or upload a banner image.");
+      return;
+    }
+
+    const res = await adminSaveBanner({
+      id: editingBanner.id,
+      title: editingBanner.title || "Promotional Banner",
+      image_url: editingBanner.image_url,
+      link_url: editingBanner.link_url || "/shop",
+      is_active: editingBanner.is_active ?? true,
+      sort_order: editingBanner.sort_order ?? (banners.length + 1),
+    });
+
+    if (res.success) {
+      showToast(editingBanner.id ? "✅ Banner updated!" : "✅ Banner created!");
+      setBannerModalOpen(false);
+      setEditingBanner(null);
+      loadData(false);
+    } else {
+      showToast(`❌ Error: ${res.error || "Save failed"}`);
+    }
+  };
+
+  // Save coupon handler
+  const handleSaveCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCoupon?.code?.trim()) {
+      showToast("Please enter a coupon code.");
+      return;
+    }
+
+    const res = await adminSaveCoupon({
+      id: editingCoupon.id,
+      code: editingCoupon.code.trim().toUpperCase(),
+      discount_type: editingCoupon.discount_type || "fixed",
+      discount_value: Number(editingCoupon.discount_value) || 0,
+      min_spend: Number(editingCoupon.min_spend) || 0,
+      free_shipping: Boolean(editingCoupon.free_shipping),
+      is_active: editingCoupon.is_active ?? true,
+    });
+
+    if (res.success) {
+      showToast(editingCoupon.id ? "✅ Coupon updated!" : "✅ Coupon created!");
+      setCouponModalOpen(false);
+      setEditingCoupon(null);
+      loadData(false);
+    } else {
+      showToast(`❌ Error: ${res.error || "Save failed"}`);
+    }
   };
 
   // Save category handler
@@ -895,6 +981,19 @@ export default function AdminPage() {
           >
             <ImageIcon className="w-4 h-4" />
             <span>Banners Hub ({banners.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("coupons")}
+            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
+              activeTab === "coupons"
+                ? "bg-brand-pink text-white shadow-md shadow-brand-pink/20"
+                : "text-slate-400 hover:bg-slate-800 hover:text-white"
+            }`}
+          >
+            <Tag className="w-4 h-4" />
+            <span>Coupons & Discounts ({coupons.length})</span>
           </button>
 
           {/* HHC Dropshipping Pakistan Section with Submenus */}
@@ -1642,22 +1741,43 @@ export default function AdminPage() {
         )}
 
         {/* ==========================================
-            TAB 4: BANNERS HUB
+            TAB 4: BANNERS HUB (FULL CRUD WITH WEBP PREVIEW)
         =========================================== */}
         {activeTab === "banners" && (
           <div className="space-y-6">
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h2 className="text-lg font-black text-slate-900">Banners Hub (Pure Images Only)</h2>
-                <p className="text-xs text-slate-500">
-                  Upload promotional banners. Recommended size: <strong>2048 x 768 px</strong> (Aspect ratio ~2.66:1).
+                <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <ImageIcon className="w-5 h-5 text-brand-pink" />
+                  <span>Homepage Banners Hub</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Manage hero sliders with live automatic synchronization. Recommended: <strong>2048 x 768 px</strong> (~2.66:1 aspect ratio).
                 </p>
               </div>
 
-              <div>
-                <label className="cursor-pointer flex items-center gap-1.5 px-4 py-2 bg-brand-pink hover:bg-brand-pinkHover text-white text-xs font-extrabold rounded-xl shadow-md transition">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingBanner({
+                      title: "",
+                      link_url: "/shop",
+                      image_url: "",
+                      is_active: true,
+                      sort_order: banners.length + 1,
+                    });
+                    setBannerModalOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-brand-pink hover:bg-brand-pinkHover text-white text-xs font-extrabold rounded-xl shadow-md transition"
+                >
                   <Plus className="w-4 h-4" />
-                  <span>Upload New Banner</span>
+                  <span>+ Add New Banner</span>
+                </button>
+
+                <label className="cursor-pointer flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition">
+                  <Upload className="w-4 h-4" />
+                  <span>Quick Upload</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -1667,17 +1787,19 @@ export default function AdminPage() {
                       showToast("Compressing banner image to WebP...");
                       const { url } = await compressAndUploadImage(file, "abrishmart-media");
                       if (url) {
-                        await supabase.from("banners").insert([
-                          {
-                            title: file.name.replace(/\.[^/.]+$/, ""),
-                            image_url: url,
-                            link_url: "/shop",
-                            is_active: true,
-                            sort_order: banners.length + 1,
-                          },
-                        ]);
-                        showToast("✅ Banner added to homepage slider!");
-                        loadData(false);
+                        const res = await adminSaveBanner({
+                          title: file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "),
+                          image_url: url,
+                          link_url: "/shop",
+                          is_active: true,
+                          sort_order: banners.length + 1,
+                        });
+                        if (res.success) {
+                          showToast("✅ Banner added to homepage slider!");
+                          loadData(false);
+                        } else {
+                          showToast("❌ Failed to save banner.");
+                        }
                       }
                     }}
                     className="hidden"
@@ -1686,43 +1808,289 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {banners.map((ban) => (
-                <div
-                  key={ban.id}
-                  className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3"
+            {banners.length === 0 ? (
+              <div className="bg-white rounded-2xl p-12 border border-slate-200 text-center space-y-3">
+                <ImageIcon className="w-12 h-12 text-slate-300 mx-auto" />
+                <h3 className="text-sm font-bold text-slate-800">No Banners Added Yet</h3>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  Add high-converting promotional banners to showcase your deals and flash sales on the homepage.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingBanner({
+                      title: "New Promotional Deal",
+                      link_url: "/shop",
+                      image_url: "",
+                      is_active: true,
+                      sort_order: 1,
+                    });
+                    setBannerModalOpen(true);
+                  }}
+                  className="px-5 py-2.5 bg-brand-pink text-white text-xs font-bold rounded-xl shadow hover:bg-brand-pinkHover transition"
                 >
-                  <div className="relative aspect-[2.66/1] w-full rounded-xl overflow-hidden bg-slate-900 border border-slate-200">
-                    <Image
-                      src={ban.image_url}
-                      alt={ban.title}
-                      fill
-                      sizes="(max-width: 768px) 100vw, 50vw"
-                      className="object-cover"
-                      unoptimized
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <div>
-                      <p className="font-bold text-slate-800">{ban.title || "Promotional Banner"}</p>
-                      <p className="text-[10px] text-slate-400">Target URL: {ban.link_url || "/shop"}</p>
+                  Create First Banner
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {banners.map((ban, idx) => (
+                  <div
+                    key={ban.id || idx}
+                    className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3 hover:shadow-md transition"
+                  >
+                    <div className="relative aspect-[2.66/1] w-full rounded-xl overflow-hidden bg-slate-900 border border-slate-200 group">
+                      <Image
+                        src={ban.image_url}
+                        alt={ban.title}
+                        fill
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                        className="object-cover"
+                        unoptimized
+                      />
+                      <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                        <span
+                          className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-xs backdrop-blur-xs ${
+                            ban.is_active
+                              ? "bg-emerald-500 text-white"
+                              : "bg-slate-700/80 text-slate-300"
+                          }`}
+                        >
+                          {ban.is_active ? "● Live on Site" : "○ Inactive"}
+                        </span>
+                        <span className="text-[10px] font-bold bg-black/60 text-white px-2 py-0.5 rounded-full">
+                          Order #{ban.sort_order || idx + 1}
+                        </span>
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await supabase.from("banners").delete().eq("id", ban.id);
-                        showToast("Banner deleted.");
-                        loadData(false);
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
-                      title="Delete Banner"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+
+                    <div className="flex items-start justify-between gap-3 text-xs">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-slate-900 truncate">{ban.title || "Promotional Banner"}</p>
+                        <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                          Target: <code className="text-brand-pink bg-pink-50 px-1 py-0.5 rounded">{ban.link_url || "/shop"}</code>
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const res = await adminSaveBanner({
+                              ...ban,
+                              is_active: !ban.is_active,
+                            });
+                            if (res.success) {
+                              showToast(ban.is_active ? "Banner hidden from site" : "Banner activated!");
+                              loadData(false);
+                            }
+                          }}
+                          className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition ${
+                            ban.is_active
+                              ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                              : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                          }`}
+                        >
+                          {ban.is_active ? "Deactivate" : "Activate"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingBanner(ban);
+                            setBannerModalOpen(true);
+                          }}
+                          className="p-1.5 text-slate-500 hover:text-brand-pink rounded-lg hover:bg-pink-50 transition"
+                          title="Edit Banner Details"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDeleteConfirm({
+                              open: true,
+                              type: "banner",
+                              id: ban.id,
+                              title: ban.title || "Promotional Banner",
+                            })
+                          }
+                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
+                          title="Delete Banner"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==========================================
+            TAB 4B: COUPONS & DISCOUNTS MANAGER
+        =========================================== */}
+        {activeTab === "coupons" && (
+          <div className="space-y-6">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <Tag className="w-5 h-5 text-brand-pink" />
+                  <span>Coupons & Promo Codes Manager</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Create discount vouchers (Fixed PKR or % Off) for Checkout and Quick Order across Pakistan.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingCoupon({
+                    code: "",
+                    discount_type: "fixed",
+                    discount_value: 200,
+                    min_spend: 1500,
+                    free_shipping: false,
+                    is_active: true,
+                  });
+                  setCouponModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 bg-brand-pink hover:bg-brand-pinkHover text-white text-xs font-extrabold rounded-xl shadow-md transition"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Create New Coupon</span>
+              </button>
             </div>
+
+            {coupons.length === 0 ? (
+              <div className="bg-white rounded-2xl p-12 border border-slate-200 text-center space-y-3">
+                <Tag className="w-12 h-12 text-slate-300 mx-auto" />
+                <h3 className="text-sm font-bold text-slate-800">No Active Coupons</h3>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  Attract customers with promo coupons like WELCOME200 or 10% seasonal discount.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingCoupon({
+                      code: "WELCOME200",
+                      discount_type: "fixed",
+                      discount_value: 200,
+                      min_spend: 1500,
+                      free_shipping: false,
+                      is_active: true,
+                    });
+                    setCouponModalOpen(true);
+                  }}
+                  className="px-5 py-2.5 bg-brand-pink text-white text-xs font-bold rounded-xl shadow hover:bg-brand-pinkHover transition"
+                >
+                  Create First Coupon
+                </button>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200 text-[11px] uppercase tracking-wider">
+                        <th className="py-3 px-4">Coupon Code</th>
+                        <th className="py-3 px-4">Discount Type</th>
+                        <th className="py-3 px-4">Discount Value</th>
+                        <th className="py-3 px-4">Min Spend</th>
+                        <th className="py-3 px-4">Free Shipping</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {coupons.map((cpn) => (
+                        <tr key={cpn.id} className="hover:bg-slate-50/70 transition">
+                          <td className="py-3 px-4 font-black text-slate-900 tracking-wider">
+                            <span className="bg-brand-softPink/60 text-brand-pink border border-brand-pink/20 px-2.5 py-1 rounded-md">
+                              {cpn.code}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-600 font-medium capitalize">
+                            {cpn.discount_type === "percentage" ? "Percentage (%)" : "Fixed Amount (PKR)"}
+                          </td>
+                          <td className="py-3 px-4 font-bold text-emerald-600">
+                            {cpn.discount_type === "percentage" ? `${cpn.discount_value}% OFF` : `Rs. ${cpn.discount_value} OFF`}
+                          </td>
+                          <td className="py-3 px-4 text-slate-600">
+                            {cpn.min_spend > 0 ? `Rs. ${cpn.min_spend.toLocaleString()}` : "No Minimum"}
+                          </td>
+                          <td className="py-3 px-4">
+                            {cpn.free_shipping ? (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                Yes (Free Delivery)
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-400">Standard</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const res = await adminSaveCoupon({
+                                  ...cpn,
+                                  is_active: !cpn.is_active,
+                                });
+                                if (res.success) {
+                                  showToast(cpn.is_active ? "Coupon deactivated" : "Coupon activated!");
+                                  loadData(false);
+                                }
+                              }}
+                              className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full transition ${
+                                cpn.is_active
+                                  ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                              }`}
+                            >
+                              {cpn.is_active ? "● Active" : "○ Inactive"}
+                            </button>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingCoupon(cpn);
+                                  setCouponModalOpen(true);
+                                }}
+                                className="p-1.5 text-slate-500 hover:text-brand-pink hover:bg-pink-50 rounded-lg transition"
+                                title="Edit Coupon"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setDeleteConfirm({
+                                    open: true,
+                                    type: "coupon",
+                                    id: cpn.id,
+                                    title: cpn.code,
+                                  })
+                                }
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                                title="Delete Coupon"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -3207,6 +3575,251 @@ export default function AdminPage() {
                   className="px-5 py-2 bg-brand-pink hover:bg-brand-pinkHover text-white font-bold rounded-xl shadow"
                 >
                   Save Category
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL 2B: ADD / EDIT BANNER
+      =========================================== */}
+      {bannerModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <h3 className="text-base font-black text-slate-900">
+              {editingBanner?.id ? "Edit Promotional Banner" : "Add New Promotional Banner"}
+            </h3>
+
+            <form onSubmit={handleSaveBanner} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Banner Title / Campaign Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={editingBanner?.title || ""}
+                  onChange={(e) => setEditingBanner((b) => ({ ...(b || {}), title: e.target.value }))}
+                  placeholder="e.g. Mega Summer Flash Sale 2026"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Target Click URL</label>
+                <input
+                  type="text"
+                  value={editingBanner?.link_url || "/shop"}
+                  onChange={(e) => setEditingBanner((b) => ({ ...(b || {}), link_url: e.target.value }))}
+                  placeholder="/shop, /flash-deals, or /category/?slug=..."
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Banner Image (WebP Recommended) *</label>
+                <div className="space-y-2">
+                  {editingBanner?.image_url && (
+                    <div className="relative aspect-[2.66/1] w-full rounded-xl overflow-hidden bg-slate-900 border border-slate-200">
+                      <Image
+                        src={editingBanner.image_url}
+                        alt="Banner Preview"
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        showToast("Compressing banner image to WebP...");
+                        const { url } = await compressAndUploadImage(file, "abrishmart-media");
+                        if (url) {
+                          setEditingBanner((b) => ({ ...(b || {}), image_url: url }));
+                          showToast("Image uploaded successfully!");
+                        }
+                      }}
+                      className="w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-pink file:text-white"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    value={editingBanner?.image_url || ""}
+                    onChange={(e) => setEditingBanner((b) => ({ ...(b || {}), image_url: e.target.value }))}
+                    placeholder="Or enter direct image URL (/images/banners/...)"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 text-slate-700 text-[11px]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Display Sort Order</label>
+                  <input
+                    type="number"
+                    value={editingBanner?.sort_order ?? 1}
+                    onChange={(e) => setEditingBanner((b) => ({ ...(b || {}), sort_order: Number(e.target.value) || 1 }))}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 pt-6">
+                  <input
+                    type="checkbox"
+                    id="banner_active"
+                    checked={editingBanner?.is_active ?? true}
+                    onChange={(e) => setEditingBanner((b) => ({ ...(b || {}), is_active: e.target.checked }))}
+                    className="rounded text-brand-pink"
+                  />
+                  <label htmlFor="banner_active" className="cursor-pointer font-semibold text-slate-800">
+                    Active (Live on Slider)
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setBannerModalOpen(false)}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-brand-pink hover:bg-brand-pinkHover text-white font-bold rounded-xl shadow"
+                >
+                  Save Banner
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL 2C: ADD / EDIT COUPON
+      =========================================== */}
+      {couponModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <h3 className="text-base font-black text-slate-900">
+              {editingCoupon?.id ? "Edit Coupon / Discount" : "Create New Coupon"}
+            </h3>
+
+            <form onSubmit={handleSaveCoupon} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Coupon Code *</label>
+                <input
+                  type="text"
+                  required
+                  value={editingCoupon?.code || ""}
+                  onChange={(e) => setEditingCoupon((c) => ({ ...(c || {}), code: e.target.value.toUpperCase() }))}
+                  placeholder="e.g. WELCOME200 or MEGA10"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 uppercase font-black tracking-wider"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Discount Type *</label>
+                  <select
+                    value={editingCoupon?.discount_type || "fixed"}
+                    onChange={(e) =>
+                      setEditingCoupon((c) => ({
+                        ...(c || {}),
+                        discount_type: e.target.value as "fixed" | "percentage",
+                      }))
+                    }
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
+                  >
+                    <option value="fixed">Fixed PKR (Rs.)</option>
+                    <option value="percentage">Percentage (%)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {editingCoupon?.discount_type === "percentage" ? "Discount Percentage (%) *" : "Discount Amount (PKR) *"}
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={editingCoupon?.discount_value ?? 200}
+                    onChange={(e) =>
+                      setEditingCoupon((c) => ({ ...(c || {}), discount_value: Number(e.target.value) || 0 }))
+                    }
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Minimum Order Amount (PKR)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={editingCoupon?.min_spend ?? 1500}
+                  onChange={(e) =>
+                    setEditingCoupon((c) => ({ ...(c || {}), min_spend: Number(e.target.value) || 0 }))
+                  }
+                  placeholder="0 for no minimum"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
+                />
+                <p className="text-[10px] text-slate-400 mt-0.5">Customer cart subtotal must reach this value to use code.</p>
+              </div>
+
+              <div className="space-y-2 pt-1 border-t border-slate-100">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="cpn_freeship"
+                    checked={editingCoupon?.free_shipping ?? false}
+                    onChange={(e) =>
+                      setEditingCoupon((c) => ({ ...(c || {}), free_shipping: e.target.checked }))
+                    }
+                    className="rounded text-brand-pink"
+                  />
+                  <label htmlFor="cpn_freeship" className="cursor-pointer font-semibold text-slate-800">
+                    Grant Free Shipping (waives Rs. 200 fee)
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="cpn_active"
+                    checked={editingCoupon?.is_active ?? true}
+                    onChange={(e) =>
+                      setEditingCoupon((c) => ({ ...(c || {}), is_active: e.target.checked }))
+                    }
+                    className="rounded text-brand-pink"
+                  />
+                  <label htmlFor="cpn_active" className="cursor-pointer font-semibold text-slate-800">
+                    Active (Can be applied by customers)
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setCouponModalOpen(false)}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-brand-pink hover:bg-brand-pinkHover text-white font-bold rounded-xl shadow"
+                >
+                  Save Coupon
                 </button>
               </div>
             </form>

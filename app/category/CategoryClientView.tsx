@@ -20,6 +20,7 @@ export default function CategoryClientView({ slug }: { slug: string }) {
   const pageSize = 8; // STRICT 8 PRODUCTS PER PAGE
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     async function loadData() {
       setLoading(true);
       const [cats, prodRes] = await Promise.all([

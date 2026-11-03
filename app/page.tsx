@@ -46,9 +46,11 @@ export default function HomePage() {
     };
     window.addEventListener("kb_products_updated", handleUpdate);
     window.addEventListener("kb_categories_updated", handleUpdate);
+    window.addEventListener("kb_banners_updated", handleUpdate);
     return () => {
       window.removeEventListener("kb_products_updated", handleUpdate);
       window.removeEventListener("kb_categories_updated", handleUpdate);
+      window.removeEventListener("kb_banners_updated", handleUpdate);
     };
   }, []);
 
