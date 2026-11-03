@@ -43,6 +43,15 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
   const [mobileExpandedCat, setMobileExpandedCat] = useState<string | null>(null);
   const [mobileExpandedSub, setMobileExpandedSub] = useState<string | null>(null);
 
+  // Broadcast mobile menu state so bottom nav hides cleanly when open
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("kb_mobile_menu_state", { detail: { isOpen: mobileMenuOpen } })
+      );
+    }
+  }, [mobileMenuOpen]);
+
   // Load and sync categories
   const loadHeaderCategories = async () => {
     try {
@@ -433,7 +442,7 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
           MOBILE MENU DRAWER WITH ACCORDION SUB-CATEGORIES
       ========================================================= */}
       {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-x-0 top-[57px] bottom-[80px] z-50 bg-white border-b border-slate-200 px-4 pt-4 pb-12 space-y-3 shadow-2xl overflow-y-auto overscroll-contain">
+        <div className="md:hidden bg-white border-b border-slate-200 px-4 pt-4 pb-12 space-y-3 shadow-2xl animate-in fade-in duration-150 overflow-y-auto max-h-[82vh] overscroll-contain">
           {/* Flash Sale Banner on Mobile */}
           <Link
             href="/flash-deals"

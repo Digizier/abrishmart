@@ -61,6 +61,7 @@ import {
   adminSaveCoupon,
   adminDeleteCoupon,
   adminUpdateOrderStatus,
+  adminDeleteOrder,
   adminUpdateOrderHhcDispatch,
   adminSaveSettings,
   INITIAL_PRODUCTS,
@@ -140,7 +141,7 @@ export default function AdminPage() {
 
   const [deleteConfirm, setDeleteConfirm] = useState<{
     open: boolean;
-    type: "product" | "category" | "banner" | "coupon";
+    type: "product" | "category" | "banner" | "coupon" | "order";
     id: string | number;
     title: string;
   } | null>(null);
@@ -226,7 +227,7 @@ export default function AdminPage() {
     if (!silent) setIsRefreshing(true);
     try {
       const [prodRes, cats, bans, setts, coups, ords] = await Promise.all([
-        getProducts({ limit: 100 }),
+        getProducts({ limit: 500, includeInactive: true }),
         getCategories(),
         getBanners(true),
         getSiteSettings(),
@@ -737,6 +738,9 @@ export default function AdminPage() {
     } else if (type === "coupon") {
       await adminDeleteCoupon(id);
       showToast("✅ Coupon removed permanently.");
+    } else if (type === "order") {
+      await adminDeleteOrder(id);
+      showToast("✅ Order deleted from database.");
     }
     setDeleteConfirm(null);
     loadData(false);
@@ -1729,6 +1733,22 @@ export default function AdminPage() {
                             >
                               <Printer className="w-4 h-4" />
                             </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDeleteConfirm({
+                                  open: true,
+                                  type: "order",
+                                  id: ord.id,
+                                  title: `Order #${ord.order_number} (${ord.customer_name})`,
+                                })
+                              }
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition inline-block align-middle ml-1"
+                              title="Delete Order Permanently"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </td>
                         </tr>
                       ))
@@ -2596,30 +2616,47 @@ export default function AdminPage() {
                               )}
                             </td>
                             <td className="p-3.5 text-right">
-                              {isDispatched ? (
-                                <span className="text-[11px] font-bold text-slate-400 px-3 py-1 bg-slate-100 rounded-lg">
-                                  Completed
-                                </span>
-                              ) : (
+                              <div className="flex items-center justify-end gap-1.5">
+                                {isDispatched ? (
+                                  <span className="text-[11px] font-bold text-slate-400 px-3 py-1 bg-slate-100 rounded-lg">
+                                    Completed
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={hhcDispatchingId === ord.id}
+                                    onClick={() => handleHhcDispatch(ord, hhcSelectedCourierId)}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1"
+                                  >
+                                    {hhcDispatchingId === ord.id ? (
+                                      <>
+                                        <RefreshCw className="w-3 h-3 animate-spin" />
+                                        <span>Dispatching...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Send className="w-3 h-3" />
+                                        <span>Dispatch to HHC</span>
+                                      </>
+                                    )}
+                                  </button>
+                                )}
                                 <button
                                   type="button"
-                                  disabled={hhcDispatchingId === ord.id}
-                                  onClick={() => handleHhcDispatch(ord, hhcSelectedCourierId)}
-                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1 ml-auto"
+                                  onClick={() =>
+                                    setDeleteConfirm({
+                                      open: true,
+                                      type: "order",
+                                      id: ord.id,
+                                      title: `Order #${ord.order_number} (${ord.customer_name})`,
+                                    })
+                                  }
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                                  title="Delete Order Permanently"
                                 >
-                                  {hhcDispatchingId === ord.id ? (
-                                    <>
-                                      <RefreshCw className="w-3 h-3 animate-spin" />
-                                      <span>Dispatching...</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Send className="w-3 h-3" />
-                                      <span>Dispatch to HHC</span>
-                                    </>
-                                  )}
+                                  <Trash2 className="w-4 h-4" />
                                 </button>
-                              )}
+                              </div>
                             </td>
                           </tr>
                         );

@@ -622,15 +622,19 @@ export async function getProducts(options?: {
   offset?: number;
   featured?: boolean;
   flashDeals?: boolean;
+  includeInactive?: boolean;
 }): Promise<{ products: Product[]; total: number }> {
   try {
     let query = supabase
       .from("products")
       .select(
-        "id, title, slug, description, price, original_price, wholesale_price, stock, thumbnail_url, gallery_urls, category_slug, subcategory_slug, child_subcategory_slug, is_active, is_featured, is_flash_deal, rating, reviews_count, variations, sku, created_at",
+        "id, title, slug, description, price, original_price, wholesale_price, stock, thumbnail_url, gallery_urls, category_slug, subcategory_slug, child_subcategory_slug, is_active, is_featured, is_flash_deal, rating, reviews_count, variations, sku, hhc_product_id, hhc_store_id, created_at",
         { count: "exact" }
-      )
-      .eq("is_active", true);
+      );
+
+    if (!options?.includeInactive) {
+      query = query.eq("is_active", true);
+    }
 
     if (options?.category) {
       query = query.eq("category_slug", options.category);
@@ -652,7 +656,7 @@ export async function getProducts(options?: {
     const from = options?.offset || 0;
     const to = from + limit - 1;
 
-    query = query.order("id", { ascending: false }).range(from, to);
+    query = query.order("created_at", { ascending: false }).range(from, to);
 
     const { data, count, error } = await query;
 
@@ -684,9 +688,57 @@ export async function getProducts(options?: {
       };
     }
 
+    // Bi-directional auto-sync: merge remote with any offline/local-imported products
+    const localProds = getStoredProducts();
+    const map = new Map<string, Product>();
+    (data as Product[]).forEach((p) => map.set(p.slug, p));
+
+    const missingRemote: Product[] = [];
+    localProds.forEach((lp) => {
+      if (!map.has(lp.slug)) {
+        map.set(lp.slug, lp);
+        missingRemote.push(lp);
+      }
+    });
+
+    if (missingRemote.length > 0) {
+      try {
+        supabase.from("products").upsert(missingRemote, { onConflict: "slug" }).then(() => {});
+      } catch {}
+    }
+
+    let mergedList = Array.from(map.values());
+    if (!options?.includeInactive) {
+      mergedList = mergedList.filter((p) => p.is_active);
+    }
+    if (options?.category) {
+      mergedList = mergedList.filter((p) => p.category_slug === options.category);
+    }
+    if (options?.subcategory) {
+      mergedList = mergedList.filter((p) => p.subcategory_slug === options.subcategory);
+    }
+    if (options?.search) {
+      const q = options.search.toLowerCase();
+      mergedList = mergedList.filter((p) => p.title.toLowerCase().includes(q) || p.category_slug.toLowerCase().includes(q));
+    }
+    if (options?.flashDeals) {
+      mergedList = mergedList.filter((p) => p.is_flash_deal);
+    }
+    if (options?.featured) {
+      mergedList = mergedList.filter((p) => p.is_featured);
+    }
+
+    mergedList.sort((a, b) => {
+      const tA = new Date(a.created_at || "").getTime();
+      const tB = new Date(b.created_at || "").getTime();
+      return tB - tA;
+    });
+
+    setStoredProducts(Array.from(map.values()));
+
     return {
-      products: data as Product[],
-      total: count || data.length,
+      products: mergedList.slice(from, from + limit),
+      total: mergedList.length,
     };
   } catch {
     const list = getStoredProducts().filter((p) => p.is_active);
@@ -742,23 +794,61 @@ export async function getCategories(): Promise<Category[]> {
   try {
     const { data, error } = await supabase
       .from("categories")
-      .select("id, name, slug, image_url, parent_slug, show_on_homepage, sort_order")
+      .select("id, name, slug, image_url, parent_slug, level, subcategories, show_on_homepage, sort_order")
       .order("sort_order", { ascending: true });
 
-    if (error || !data || data.length === 0) {
-      return getStoredCategories();
+    const localCats = getStoredCategories();
+    const map = new Map<string, Category>();
+
+    if (!error && data && data.length > 0) {
+      (data as Category[]).forEach((c) => map.set(c.slug, c));
     }
 
-    // Merge subcategories from local store if needed
-    const localCats = getStoredCategories();
-    const merged = (data as Category[]).map((c) => {
-      const found = localCats.find((l) => l.slug === c.slug);
-      return {
-        ...c,
-        subcategories: found?.subcategories || [],
-      };
+    // Auto-heal: If local browser has categories missing from remote, push them to remote!
+    const missingCats: Category[] = [];
+    localCats.forEach((lc) => {
+      if (!map.has(lc.slug)) {
+        map.set(lc.slug, lc);
+        missingCats.push(lc);
+      }
     });
 
+    if (missingCats.length > 0) {
+      try {
+        supabase
+          .from("categories")
+          .upsert(
+            missingCats.map((c) => ({
+              id: String(c.id),
+              name: c.name,
+              slug: c.slug,
+              image_url: c.image_url,
+              parent_slug: c.parent_slug,
+              level: c.level || 1,
+              subcategories: c.subcategories || [],
+              show_on_homepage: c.show_on_homepage,
+              sort_order: c.sort_order,
+            })),
+            { onConflict: "slug" }
+          )
+          .then(() => {});
+      } catch {}
+    }
+
+    const merged = Array.from(map.values())
+      .map((c) => {
+        const found = localCats.find((l) => l.slug === c.slug);
+        return {
+          ...c,
+          subcategories:
+            c.subcategories && Array.isArray(c.subcategories) && c.subcategories.length > 0
+              ? c.subcategories
+              : found?.subcategories || [],
+        };
+      })
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+    setStoredCategories(merged);
     return merged;
   } catch {
     return getStoredCategories();
@@ -889,6 +979,27 @@ export async function getOrderById(orderNumber: string): Promise<Order | null> {
   return localMatch || null;
 }
 
+export async function adminDeleteOrder(orderId: string | number): Promise<{ success: boolean; error?: string }> {
+  try {
+    const orders = getStoredOrders().filter(
+      (o) => String(o.id) !== String(orderId) && o.order_number !== String(orderId)
+    );
+    setStoredOrders(orders);
+
+    try {
+      await supabase.from("orders").delete().or(`id.eq.${orderId},order_number.eq.${orderId}`);
+    } catch {}
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("kb_orders_updated", { detail: orders }));
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Order deletion failed";
+    return { success: false, error: msg };
+  }
+}
+
 // ==========================================
 // SETTINGS & BANNERS
 // ==========================================
@@ -984,7 +1095,7 @@ export async function adminSaveBanner(banner: Partial<Banner>): Promise<{ succes
     try {
       await supabase.from("banners").upsert([
         {
-          id: typeof id === "number" ? id : undefined,
+          id: String(cleanBanner.id),
           title: cleanBanner.title,
           image_url: cleanBanner.image_url,
           link_url: cleanBanner.link_url,
@@ -1235,11 +1346,7 @@ export async function adminSaveProduct(product: Partial<Product>): Promise<{ suc
 
     // 2. Try remote database sync
     try {
-      if (typeof product.id === "number" && product.id > 100) {
-        await supabase.from("products").update(cleanPayload).eq("id", product.id);
-      } else {
-        await supabase.from("products").insert([cleanPayload]);
-      }
+      await supabase.from("products").upsert(cleanPayload, { onConflict: "slug" });
     } catch {}
 
     if (typeof window !== "undefined") {
@@ -1255,12 +1362,12 @@ export async function adminSaveProduct(product: Partial<Product>): Promise<{ suc
 export async function adminDeleteProduct(id: string | number): Promise<{ success: boolean; error?: string }> {
   try {
     // 1. Remove from local store
-    const prods = getStoredProducts().filter((p) => String(p.id) !== String(id));
+    const prods = getStoredProducts().filter((p) => String(p.id) !== String(id) && p.slug !== String(id));
     setStoredProducts(prods);
 
     // 2. Try remote delete
     try {
-      await supabase.from("products").delete().eq("id", id);
+      await supabase.from("products").delete().or(`id.eq.${id},slug.eq.${id}`);
     } catch {}
 
     if (typeof window !== "undefined") {
@@ -1276,7 +1383,7 @@ export async function adminDeleteProduct(id: string | number): Promise<{ success
 export async function adminSaveCategory(category: Partial<Category>): Promise<{ success: boolean; error?: string }> {
   try {
     const newCat: Category = {
-      id: category.id || Date.now(),
+      id: category.id || `CAT-${Date.now()}`,
       name: category.name || "New Category",
       slug: category.slug || `cat-${Date.now()}`,
       image_url: category.image_url || "/images/categories/bridal-silk.webp",
@@ -1300,25 +1407,20 @@ export async function adminSaveCategory(category: Partial<Category>): Promise<{ 
 
     // 2. Try remote database sync
     try {
-      if (typeof category.id === "number" && category.id > 100) {
-        await supabase.from("categories").update({
+      await supabase.from("categories").upsert(
+        {
+          id: String(newCat.id),
           name: newCat.name,
           slug: newCat.slug,
           image_url: newCat.image_url,
           parent_slug: newCat.parent_slug,
+          level: newCat.level || 1,
+          subcategories: newCat.subcategories || [],
           show_on_homepage: newCat.show_on_homepage,
           sort_order: newCat.sort_order,
-        }).eq("id", category.id);
-      } else {
-        await supabase.from("categories").insert([{
-          name: newCat.name,
-          slug: newCat.slug,
-          image_url: newCat.image_url,
-          parent_slug: newCat.parent_slug,
-          show_on_homepage: newCat.show_on_homepage,
-          sort_order: newCat.sort_order,
-        }]);
-      }
+        },
+        { onConflict: "slug" }
+      );
     } catch {}
 
     if (typeof window !== "undefined") {
@@ -1333,11 +1435,11 @@ export async function adminSaveCategory(category: Partial<Category>): Promise<{ 
 
 export async function adminDeleteCategory(id: string | number): Promise<{ success: boolean; error?: string }> {
   try {
-    const cats = getStoredCategories().filter((c) => String(c.id) !== String(id));
+    const cats = getStoredCategories().filter((c) => String(c.id) !== String(id) && c.slug !== String(id));
     setStoredCategories(cats);
 
     try {
-      await supabase.from("categories").delete().eq("id", id);
+      await supabase.from("categories").delete().or(`id.eq.${id},slug.eq.${id}`);
     } catch {}
 
     if (typeof window !== "undefined") {

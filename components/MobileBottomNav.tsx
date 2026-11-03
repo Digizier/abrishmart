@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Grid, ShoppingBag, PhoneCall, PackageSearch } from "lucide-react";
@@ -12,6 +12,20 @@ interface MobileBottomNavProps {
 
 export default function MobileBottomNav({ onOpenCart, cartCount = 0 }: MobileBottomNavProps) {
   const pathname = usePathname();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleMenuState = (e: Event) => {
+      const customEvent = e as CustomEvent<{ isOpen?: boolean }>;
+      setIsMenuOpen(Boolean(customEvent.detail?.isOpen));
+    };
+
+    window.addEventListener("kb_mobile_menu_state", handleMenuState);
+    return () => window.removeEventListener("kb_mobile_menu_state", handleMenuState);
+  }, []);
+
+  // When mobile header menu is open, hide the bottom navigation dock completely to prevent any overlap
+  if (isMenuOpen) return null;
 
   const isHome = pathname === "/";
   const isShop = pathname?.startsWith("/shop") || pathname?.startsWith("/category");
