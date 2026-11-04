@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS public.store_settings (
   bank_name TEXT DEFAULT 'Meezan Bank',
   bank_title TEXT DEFAULT 'Usman Shah',
   bank_iban TEXT DEFAULT 'PK72MEZN0001020304050607',
-  admin_pin TEXT DEFAULT 'abrishmart_smart2026',
+  admin_pin TEXT DEFAULT '7e129bc9c65613c98cfb7597f43c5677140c05f84e61ceed714f96b3ced7bf18',
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 

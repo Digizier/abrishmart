@@ -544,7 +544,7 @@ export const INITIAL_SETTINGS: SiteSettings = {
   bank_name: "Meezan Bank",
   bank_title: "Usman Shah",
   bank_iban: "PK72MEZN0001020304050607",
-  admin_pin: "abrishmart_smart2026",
+  admin_pin: "7e129bc9c65613c98cfb7597f43c5677140c05f84e61ceed714f96b3ced7bf18",
 };
 
 // ==========================================

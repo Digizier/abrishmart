@@ -91,11 +91,30 @@ import {
   calculateHhcSellingPrice,
 } from "@/lib/hhc";
 
+// Cryptographic SHA-256 Hash of Authorized Admin Access Key
+// (Plaintext password is NEVER stored or hardcoded anywhere in client bundles)
+const ADMIN_AUTH_HASH = "7e129bc9c65613c98cfb7597f43c5677140c05f84e61ceed714f96b3ced7bf18";
+
+async function computeSha256(str: string): Promise<string> {
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return "";
+  }
+}
+
 export default function AdminPage() {
   // Authentication Gate
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [authError, setAuthError] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutTime, setLockoutTime] = useState<number | null>(null);
 
   // Navigation Hubs: 'products' | 'categories' | 'orders' | 'banners' | 'coupons' | 'settings' | 'hhc-*'
   const [activeTab, setActiveTab] = useState<
@@ -195,20 +214,46 @@ export default function AdminPage() {
   // Check auth on load
   useEffect(() => {
     const auth = sessionStorage.getItem("abm_admin_auth");
-    if (auth === "true") {
+    if (auth === ADMIN_AUTH_HASH) {
       setIsAuthenticated(true);
     }
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Default PIN: abrishmart_smart2026 or admin123
-    if (pinInput === "abrishmart_smart2026" || pinInput === "admin123") {
-      setIsAuthenticated(true);
-      sessionStorage.setItem("abm_admin_auth", "true");
-      setAuthError("");
-    } else {
-      setAuthError("Invalid Admin PIN. Please enter the authorized access code.");
+    if (!pinInput.trim()) return;
+
+    if (lockoutTime && Date.now() < lockoutTime) {
+      const waitSec = Math.ceil((lockoutTime - Date.now()) / 1000);
+      setAuthError(`Security cooldown active. Please wait ${waitSec}s.`);
+      return;
+    }
+
+    setIsVerifying(true);
+    setAuthError("");
+
+    try {
+      const inputHash = await computeSha256(pinInput.trim());
+      if (inputHash === ADMIN_AUTH_HASH) {
+        setIsAuthenticated(true);
+        sessionStorage.setItem("abm_admin_auth", ADMIN_AUTH_HASH);
+        setAuthError("");
+        setFailedAttempts(0);
+        setLockoutTime(null);
+      } else {
+        const nextAttempts = failedAttempts + 1;
+        setFailedAttempts(nextAttempts);
+        if (nextAttempts >= 5) {
+          setLockoutTime(Date.now() + 30000);
+          setAuthError("Security Alert: Too many incorrect attempts. Locked for 30 seconds.");
+        } else {
+          setAuthError("Unauthorized: Invalid Admin Password. Access Denied.");
+        }
+      }
+    } catch {
+      setAuthError("Authentication error. Please retry.");
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -856,17 +901,23 @@ export default function AdminPage() {
                 type="password"
                 required
                 value={pinInput}
-                onChange={(e) => setPinInput(e.target.value)}
-                placeholder="Enter Admin PIN / Password"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-center text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-pink focus:border-brand-pink tracking-widest font-mono"
+                onChange={(e) => {
+                  setPinInput(e.target.value);
+                  if (authError) setAuthError("");
+                }}
+                disabled={isVerifying || (!!lockoutTime && Date.now() < lockoutTime)}
+                placeholder="Enter Secure Admin Password"
+                autoComplete="current-password"
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-center text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-pink focus:border-brand-pink tracking-widest font-mono disabled:opacity-50"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full bg-brand-pink hover:bg-brand-pinkHover text-white font-bold text-xs py-3.5 px-6 rounded-xl shadow-lg shadow-brand-pink/25 transition active:scale-[0.99]"
+              disabled={isVerifying || (!!lockoutTime && Date.now() < lockoutTime)}
+              className="w-full bg-brand-pink hover:bg-brand-pinkHover disabled:opacity-50 text-white font-bold text-xs py-3.5 px-6 rounded-xl shadow-lg shadow-brand-pink/25 transition active:scale-[0.99]"
             >
-              Access Dashboard
+              {isVerifying ? "Verifying Security Key..." : "Access Dashboard"}
             </button>
           </form>
 
