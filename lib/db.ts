@@ -660,85 +660,43 @@ export async function getProducts(options?: {
 
     const { data, count, error } = await query;
 
-    if (error || !data || data.length === 0) {
-      let filtered = getStoredProducts().filter((p) => p.is_active);
-      if (options?.category) {
-        filtered = filtered.filter((p) => p.category_slug === options.category);
-      }
-      if (options?.subcategory) {
-        filtered = filtered.filter((p) => p.subcategory_slug === options.subcategory);
-      }
-      if (options?.search) {
-        const q = options.search.toLowerCase();
-        filtered = filtered.filter(
-          (p) =>
-            p.title.toLowerCase().includes(q) ||
-            p.category_slug.toLowerCase().includes(q)
-        );
-      }
-      if (options?.flashDeals) {
-        filtered = filtered.filter((p) => p.is_flash_deal);
-      }
-      if (options?.featured) {
-        filtered = filtered.filter((p) => p.is_featured);
-      }
+    if (!error && data && data.length > 0) {
+      const prods = data as Product[];
+      setStoredProducts(prods);
       return {
-        products: filtered.slice(from, from + limit),
-        total: filtered.length,
+        products: prods,
+        total: count ?? prods.length,
       };
     }
 
-    // Bi-directional auto-sync: merge remote with any offline/local-imported products
-    const localProds = getStoredProducts();
-    const map = new Map<string, Product>();
-    (data as Product[]).forEach((p) => map.set(p.slug, p));
-
-    const missingRemote: Product[] = [];
-    localProds.forEach((lp) => {
-      if (!map.has(lp.slug)) {
-        map.set(lp.slug, lp);
-        missingRemote.push(lp);
-      }
-    });
-
-    if (missingRemote.length > 0) {
-      try {
-        supabase.from("products").upsert(missingRemote, { onConflict: "slug" }).then(() => {});
-      } catch {}
-    }
-
-    let mergedList = Array.from(map.values());
+    // Fallback only if database unreachable
+    let filtered = getStoredProducts();
     if (!options?.includeInactive) {
-      mergedList = mergedList.filter((p) => p.is_active);
+      filtered = filtered.filter((p) => p.is_active);
     }
     if (options?.category) {
-      mergedList = mergedList.filter((p) => p.category_slug === options.category);
+      filtered = filtered.filter((p) => p.category_slug === options.category);
     }
     if (options?.subcategory) {
-      mergedList = mergedList.filter((p) => p.subcategory_slug === options.subcategory);
+      filtered = filtered.filter((p) => p.subcategory_slug === options.subcategory);
     }
     if (options?.search) {
       const q = options.search.toLowerCase();
-      mergedList = mergedList.filter((p) => p.title.toLowerCase().includes(q) || p.category_slug.toLowerCase().includes(q));
+      filtered = filtered.filter(
+        (p) =>
+          p.title.toLowerCase().includes(q) ||
+          p.category_slug.toLowerCase().includes(q)
+      );
     }
     if (options?.flashDeals) {
-      mergedList = mergedList.filter((p) => p.is_flash_deal);
+      filtered = filtered.filter((p) => p.is_flash_deal);
     }
     if (options?.featured) {
-      mergedList = mergedList.filter((p) => p.is_featured);
+      filtered = filtered.filter((p) => p.is_featured);
     }
-
-    mergedList.sort((a, b) => {
-      const tA = new Date(a.created_at || "").getTime();
-      const tB = new Date(b.created_at || "").getTime();
-      return tB - tA;
-    });
-
-    setStoredProducts(Array.from(map.values()));
-
     return {
-      products: mergedList.slice(from, from + limit),
-      total: mergedList.length,
+      products: filtered.slice(from, from + limit),
+      total: filtered.length,
     };
   } catch {
     const list = getStoredProducts().filter((p) => p.is_active);
@@ -797,59 +755,12 @@ export async function getCategories(): Promise<Category[]> {
       .select("id, name, slug, image_url, parent_slug, level, subcategories, show_on_homepage, sort_order")
       .order("sort_order", { ascending: true });
 
-    const localCats = getStoredCategories();
-    const map = new Map<string, Category>();
-
     if (!error && data && data.length > 0) {
-      (data as Category[]).forEach((c) => map.set(c.slug, c));
+      const cats = data as Category[];
+      setStoredCategories(cats);
+      return cats;
     }
-
-    // Auto-heal: If local browser has categories missing from remote, push them to remote!
-    const missingCats: Category[] = [];
-    localCats.forEach((lc) => {
-      if (!map.has(lc.slug)) {
-        map.set(lc.slug, lc);
-        missingCats.push(lc);
-      }
-    });
-
-    if (missingCats.length > 0) {
-      try {
-        supabase
-          .from("categories")
-          .upsert(
-            missingCats.map((c) => ({
-              id: String(c.id),
-              name: c.name,
-              slug: c.slug,
-              image_url: c.image_url,
-              parent_slug: c.parent_slug,
-              level: c.level || 1,
-              subcategories: c.subcategories || [],
-              show_on_homepage: c.show_on_homepage,
-              sort_order: c.sort_order,
-            })),
-            { onConflict: "slug" }
-          )
-          .then(() => {});
-      } catch {}
-    }
-
-    const merged = Array.from(map.values())
-      .map((c) => {
-        const found = localCats.find((l) => l.slug === c.slug);
-        return {
-          ...c,
-          subcategories:
-            c.subcategories && Array.isArray(c.subcategories) && c.subcategories.length > 0
-              ? c.subcategories
-              : found?.subcategories || [],
-        };
-      })
-      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-
-    setStoredCategories(merged);
-    return merged;
+    return getStoredCategories();
   } catch {
     return getStoredCategories();
   }
@@ -1003,14 +914,37 @@ export async function adminDeleteOrder(orderId: string | number): Promise<{ succ
 // ==========================================
 // SETTINGS & BANNERS
 // ==========================================
+export function getStoredSettings(): SiteSettings {
+  if (typeof window === "undefined") return INITIAL_SETTINGS;
+  try {
+    const raw = localStorage.getItem("abm_stored_settings");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return { ...INITIAL_SETTINGS, ...parsed };
+    }
+  } catch {}
+  return INITIAL_SETTINGS;
+}
+
+export function setStoredSettings(settings: SiteSettings): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("abm_stored_settings", JSON.stringify(settings));
+    window.dispatchEvent(new CustomEvent("kb_settings_updated", { detail: settings }));
+  } catch {}
+}
+
 export async function getSiteSettings(): Promise<SiteSettings> {
+  const local = getStoredSettings();
   try {
     const { data, error } = await supabase.from("store_settings").select("*").eq("id", 1).maybeSingle();
-    if (error || !data) return INITIAL_SETTINGS;
-    return data as SiteSettings;
-  } catch {
-    return INITIAL_SETTINGS;
-  }
+    if (!error && data) {
+      const merged = { ...local, ...data };
+      setStoredSettings(merged);
+      return merged as SiteSettings;
+    }
+  } catch {}
+  return local;
 }
 
 export const INITIAL_BANNERS: Banner[] = [
@@ -1361,13 +1295,13 @@ export async function adminSaveProduct(product: Partial<Product>): Promise<{ suc
 
 export async function adminDeleteProduct(id: string | number): Promise<{ success: boolean; error?: string }> {
   try {
-    // 1. Remove from local store
-    const prods = getStoredProducts().filter((p) => String(p.id) !== String(id) && p.slug !== String(id));
+    const target = String(id);
+    const prods = getStoredProducts().filter((p) => String(p.id) !== target && p.slug !== target);
     setStoredProducts(prods);
 
-    // 2. Try remote delete
     try {
-      await supabase.from("products").delete().or(`id.eq.${id},slug.eq.${id}`);
+      await supabase.from("products").delete().eq("id", target);
+      await supabase.from("products").delete().eq("slug", target);
     } catch {}
 
     if (typeof window !== "undefined") {
@@ -1594,12 +1528,25 @@ export async function adminUpdateOrderHhcDispatch(
 
 export async function adminSaveSettings(settings: Partial<SiteSettings>): Promise<{ success: boolean; error?: string }> {
   try {
+    const current = getStoredSettings();
+    const updated: SiteSettings = {
+      ...current,
+      ...settings,
+      delivery_charge: settings.delivery_charge !== undefined ? Number(settings.delivery_charge) : current.delivery_charge,
+      free_shipping_threshold: settings.free_shipping_threshold !== undefined ? Number(settings.free_shipping_threshold) : current.free_shipping_threshold,
+    };
+    setStoredSettings(updated);
+
     try {
-      await supabase.from("store_settings").upsert({ id: 1, ...settings, updated_at: new Date().toISOString() });
+      await supabase.from("store_settings").upsert({
+        id: 1,
+        ...updated,
+        updated_at: new Date().toISOString()
+      });
     } catch {}
 
     if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("kb_settings_updated"));
+      window.dispatchEvent(new CustomEvent("kb_settings_updated", { detail: updated }));
     }
     return { success: true };
   } catch (err: unknown) {

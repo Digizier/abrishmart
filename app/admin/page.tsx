@@ -369,6 +369,7 @@ export default function AdminPage() {
         sku: item.sku || `HHC-${item.id}`,
         hhc_product_id: item.id,
         hhc_store_id: item.storeID,
+        created_at: new Date().toISOString(),
       };
 
       const res = await adminSaveProduct(newProduct);

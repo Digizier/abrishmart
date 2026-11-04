@@ -22,27 +22,32 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadHomeData() {
-      setLoading(true);
-      const [fetchedBanners, fetchedCategories, dealsRes, featuredRes] = await Promise.all([
-        getBanners(),
-        getCategories(),
-        getProducts({ flashDeals: true, limit: 4 }), // Strictly top 4 flash deals
-        getProducts({ limit: 8 }), // Strictly 8 products on homepage
-      ]);
+    async function loadHomeData(isInitial = false) {
+      if (isInitial) setLoading(true);
+      try {
+        const [fetchedBanners, fetchedCategories, dealsRes, featuredRes] = await Promise.all([
+          getBanners(),
+          getCategories(),
+          getProducts({ flashDeals: true, limit: 4 }), // Strictly top 4 flash deals
+          getProducts({ limit: 8 }), // Strictly 8 products on homepage
+        ]);
 
-      setBanners(fetchedBanners);
-      setCategories(fetchedCategories);
-      setFlashDeals(dealsRes.products.slice(0, 4));
-      setFeaturedProducts(featuredRes.products.slice(0, 8));
-      setLoading(false);
+        setBanners(fetchedBanners);
+        setCategories(fetchedCategories);
+        setFlashDeals(dealsRes.products.slice(0, 4));
+        setFeaturedProducts(featuredRes.products.slice(0, 8));
+      } catch (err) {
+        console.error("Home data fetch error:", err);
+      } finally {
+        if (isInitial) setLoading(false);
+      }
     }
 
-    loadHomeData();
+    loadHomeData(true);
 
     // Listen for product or category updates from admin live
     const handleUpdate = () => {
-      loadHomeData();
+      loadHomeData(false); // Silent background revalidation - never unmounts or flashes skeleton
     };
     window.addEventListener("kb_products_updated", handleUpdate);
     window.addEventListener("kb_categories_updated", handleUpdate);

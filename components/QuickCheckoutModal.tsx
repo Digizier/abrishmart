@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { X, ShieldCheck, Truck, Tag, CheckCircle2, AlertCircle } from "lucide-react";
-import { Product, OrderItem } from "@/lib/types";
-import { createOrder, validateCoupon } from "@/lib/db";
+import { Product, OrderItem, SiteSettings } from "@/lib/types";
+import { createOrder, validateCoupon, getSiteSettings, getStoredSettings } from "@/lib/db";
 
 interface QuickCheckoutModalProps {
   isOpen: boolean;
@@ -61,12 +61,28 @@ export default function QuickCheckoutModal({
   const [couponMessage, setCouponMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>(getStoredSettings());
+
+  useEffect(() => {
+    getSiteSettings().then((s) => setSiteSettings(s));
+
+    const handleSettingsUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<SiteSettings>;
+      if (customEvent.detail) setSiteSettings(customEvent.detail);
+      else getSiteSettings().then((s) => setSiteSettings(s));
+    };
+
+    window.addEventListener("kb_settings_updated", handleSettingsUpdate);
+    return () => window.removeEventListener("kb_settings_updated", handleSettingsUpdate);
+  }, []);
 
   if (!isOpen) return null;
 
-  // Calculation
+  // Dynamic Calculation based on database settings
   const subtotal = product.price * quantity;
-  const deliveryCharges = subtotal >= 2500 ? 0 : 200;
+  const freeShippingThreshold = siteSettings?.free_shipping_threshold ?? 2500;
+  const baseDelivery = siteSettings?.delivery_charge ?? 200;
+  const deliveryCharges = subtotal >= freeShippingThreshold ? 0 : baseDelivery;
   const totalPayable = Math.max(0, subtotal + deliveryCharges - discount);
 
   // Apply Promo Coupon

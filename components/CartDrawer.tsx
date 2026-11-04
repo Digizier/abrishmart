@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { X, Trash2, ShoppingBag, ArrowRight, Truck, Tag } from "lucide-react";
-import { OrderItem } from "@/lib/types";
+import { OrderItem, SiteSettings } from "@/lib/types";
+import { getSiteSettings, getStoredSettings } from "@/lib/db";
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -26,12 +27,27 @@ export default function CartDrawer({
   const [couponCode, setCouponCode] = useState("");
   const [discount, setDiscount] = useState(0);
   const [couponMsg, setCouponMsg] = useState("");
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>(getStoredSettings());
+
+  useEffect(() => {
+    getSiteSettings().then((s) => setSiteSettings(s));
+
+    const handleSettingsUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<SiteSettings>;
+      if (customEvent.detail) setSiteSettings(customEvent.detail);
+      else getSiteSettings().then((s) => setSiteSettings(s));
+    };
+
+    window.addEventListener("kb_settings_updated", handleSettingsUpdate);
+    return () => window.removeEventListener("kb_settings_updated", handleSettingsUpdate);
+  }, []);
 
   if (!isOpen) return null;
 
   const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const freeShippingThreshold = 2500;
-  const deliveryCharges = subtotal >= freeShippingThreshold || items.length === 0 ? 0 : 200;
+  const freeShippingThreshold = siteSettings?.free_shipping_threshold ?? 2500;
+  const baseDeliveryCharge = siteSettings?.delivery_charge ?? 200;
+  const deliveryCharges = subtotal >= freeShippingThreshold || items.length === 0 ? 0 : baseDeliveryCharge;
   const remainingForFreeShipping = Math.max(0, freeShippingThreshold - subtotal);
   const progressPercent = Math.min(100, Math.round((subtotal / freeShippingThreshold) * 100));
   const grandTotal = Math.max(0, subtotal + deliveryCharges - discount);

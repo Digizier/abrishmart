@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Truck, ArrowLeft, CheckCircle2, AlertCircle, Home, Building2, Tag, X } from "lucide-react";
 import { useCart } from "@/context/CartContext";
-import { createOrder, validateCoupon } from "@/lib/db";
+import { createOrder, validateCoupon, getSiteSettings, getStoredSettings } from "@/lib/db";
+import { SiteSettings } from "@/lib/types";
 import { compressAndUploadImage } from "@/lib/image-compress";
 
 const CITIES = [
@@ -38,10 +39,25 @@ export default function CheckoutPage() {
   const [isFreeShippingCoupon, setIsFreeShippingCoupon] = useState(false);
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponMessage, setCouponMessage] = useState<{ text: string; isError: boolean } | null>(null);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>(getStoredSettings());
+
+  useEffect(() => {
+    getSiteSettings().then((s) => setSiteSettings(s));
+
+    const handleSettingsUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<SiteSettings>;
+      if (customEvent.detail) setSiteSettings(customEvent.detail);
+      else getSiteSettings().then((s) => setSiteSettings(s));
+    };
+
+    window.addEventListener("kb_settings_updated", handleSettingsUpdate);
+    return () => window.removeEventListener("kb_settings_updated", handleSettingsUpdate);
+  }, []);
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const baseDelivery = subtotal >= 2500 || cart.length === 0 ? 0 : 200;
-  const deliveryCharges = isFreeShippingCoupon ? 0 : baseDelivery;
+  const freeShippingThreshold = siteSettings?.free_shipping_threshold ?? 2500;
+  const baseDelivery = siteSettings?.delivery_charge ?? 200;
+  const deliveryCharges = isFreeShippingCoupon || subtotal >= freeShippingThreshold || cart.length === 0 ? 0 : baseDelivery;
   const grandTotal = Math.max(0, subtotal + deliveryCharges - discountAmount);
 
   const handleApplyCoupon = async (e: React.FormEvent) => {
@@ -280,7 +296,9 @@ export default function CheckoutPage() {
                   />
                   <div>
                     <p className="text-xs font-bold text-slate-900">JazzCash (Advance Transfer)</p>
-                    <p className="text-[11px] text-slate-500">Account: 0345-2086160 (Usman Shah)</p>
+                    <p className="text-[11px] text-slate-500">
+                      Account: {siteSettings?.jazzcash_number || "0345-2086160"} ({siteSettings?.jazzcash_title || "Usman Shah"})
+                    </p>
                   </div>
                 </label>
 
@@ -296,7 +314,9 @@ export default function CheckoutPage() {
                   />
                   <div>
                     <p className="text-xs font-bold text-slate-900">EasyPaisa (Advance Transfer)</p>
-                    <p className="text-[11px] text-slate-500">Account: 0345-2086160 (Usman Shah)</p>
+                    <p className="text-[11px] text-slate-500">
+                      Account: {siteSettings?.easypaisa_number || "0345-2086160"} ({siteSettings?.easypaisa_title || "Usman Shah"})
+                    </p>
                   </div>
                 </label>
               </div>

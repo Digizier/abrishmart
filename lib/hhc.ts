@@ -136,6 +136,10 @@ export async function hhcGetSuppliers(page: number = 1, search: string = ""): Pr
   success: boolean;
   data: HHCSupplier[];
 }> {
+  const supplierMap = new Map<string | number, HHCSupplier>();
+  // Populate all verified supplier hubs so the list never randomly shrinks
+  HHC_VERIFIED_SUPPLIERS.forEach((s) => supplierMap.set(s.storeID || s.storeName, { ...s }));
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
@@ -151,31 +155,33 @@ export async function hhcGetSuppliers(page: number = 1, search: string = ""): Pr
       const json = await res.json();
       const list = Array.isArray(json) ? json : json.data || [];
       if (list.length > 0) {
-        // Normalize camelCase and snake_case properties
-        const normalized: HHCSupplier[] = list.map((item: any) => ({
-          storeID: Number(item.storeID || item.id || item.store_id || 0),
-          storeName: String(item.storeName || item.store_name || item.name || "HHC Supplier"),
-          cityName: String(item.cityName || item.city_name || item.city || "Karachi"),
-          hubName: String(item.hubName || item.hub_name || "Central Hub"),
-          productsCount: Number(item.productsCount || item.products_count || item.total_products || 0),
-        }));
-        return { success: true, data: normalized };
+        list.forEach((item: any) => {
+          const storeID = Number(item.storeID || item.id || item.store_id || 0);
+          const storeName = String(item.storeName || item.store_name || item.name || "HHC Supplier");
+          const existing = supplierMap.get(storeID) || supplierMap.get(storeName);
+          supplierMap.set(storeID || storeName, {
+            storeID: storeID || existing?.storeID || 0,
+            storeName: storeName || existing?.storeName || "HHC Supplier",
+            cityName: String(item.cityName || item.city_name || item.city || existing?.cityName || "Karachi"),
+            hubName: String(item.hubName || item.hub_name || existing?.hubName || "Central Hub"),
+            productsCount: Number(item.productsCount || item.products_count || item.total_products || existing?.productsCount || 0),
+          });
+        });
       }
     }
   } catch {
-    // Fallback to verified dataset
+    // Seamless fallback to full verified dataset
   }
 
-  // Filter local dataset if search is provided
-  let filtered = [...HHC_VERIFIED_SUPPLIERS];
+  let result = Array.from(supplierMap.values());
   if (search.trim()) {
     const q = search.toLowerCase();
-    filtered = filtered.filter(
+    result = result.filter(
       (s) => s.storeName.toLowerCase().includes(q) || s.cityName.toLowerCase().includes(q)
     );
   }
 
-  return { success: true, data: filtered };
+  return { success: true, data: result };
 }
 
 // --------------------------------------------------------------
