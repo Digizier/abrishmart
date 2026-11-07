@@ -892,16 +892,50 @@ export const INITIAL_SETTINGS: SiteSettings = {
 // ==========================================
 // DUAL-TIER STORAGE HELPERS (Zero-Crash Fallback)
 // ==========================================
+export function getDeletedSet(key: string): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function addToDeletedSet(key: string, id: string | number) {
+  if (typeof window === "undefined") return;
+  try {
+    const set = getDeletedSet(key);
+    set.add(String(id));
+    localStorage.setItem(key, JSON.stringify(Array.from(set)));
+  } catch {}
+}
+
+export function removeFromDeletedSet(key: string, id: string | number) {
+  if (typeof window === "undefined") return;
+  try {
+    const set = getDeletedSet(key);
+    set.delete(String(id));
+    localStorage.setItem(key, JSON.stringify(Array.from(set)));
+  } catch {}
+}
+
 function getStoredProducts(): Product[] {
   if (typeof window === "undefined") return INITIAL_PRODUCTS;
   try {
     const raw = localStorage.getItem("abm_stored_products");
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) {
+        const deleted = getDeletedSet("abm_deleted_products");
+        return parsed.filter((p) => !deleted.has(String(p.id)) && !deleted.has(p.slug));
+      }
     }
   } catch {}
-  return INITIAL_PRODUCTS;
+  const deleted = getDeletedSet("abm_deleted_products");
+  return INITIAL_PRODUCTS.filter((p) => !deleted.has(String(p.id)) && !deleted.has(p.slug));
 }
 
 function setStoredProducts(prods: Product[]) {
@@ -916,12 +950,16 @@ function getStoredCategories(): Category[] {
   if (typeof window === "undefined") return INITIAL_CATEGORIES;
   try {
     const raw = localStorage.getItem("abm_stored_categories");
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) {
+        const deleted = getDeletedSet("abm_deleted_categories");
+        return parsed.filter((c) => !deleted.has(String(c.id)) && !deleted.has(c.slug));
+      }
     }
   } catch {}
-  return INITIAL_CATEGORIES;
+  const deleted = getDeletedSet("abm_deleted_categories");
+  return INITIAL_CATEGORIES.filter((c) => !deleted.has(String(c.id)) && !deleted.has(c.slug));
 }
 
 function setStoredCategories(cats: Category[]) {
@@ -936,7 +974,7 @@ export function getStoredOrders(): Order[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem("abm_stored_orders") || localStorage.getItem("abm_orders");
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed;
     }
@@ -1147,14 +1185,19 @@ export async function getOrders(): Promise<Order[]> {
   return localOrders;
 }
 
-export async function createOrder(orderPayload: Omit<Order, "id" | "created_at">): Promise<{ success: boolean; order_number?: string; error?: string }> {
+export async function createOrder(
+  orderPayload: Omit<Order, "id" | "created_at" | "order_number" | "status"> & {
+    order_number?: string;
+    status?: Order["status"];
+  }
+): Promise<{ success: boolean; order_number?: string; error?: string }> {
   try {
-    const orderNumber = `ABM-${Math.floor(100000 + Math.random() * 900000)}`;
+    const orderNumber = orderPayload.order_number || `ABM-${Math.floor(100000 + Math.random() * 900000)}`;
     const newOrder: Order = {
       ...orderPayload,
       id: `ORD-${Date.now()}`,
       order_number: orderNumber,
-      status: "Pending",
+      status: orderPayload.status || "Pending",
       created_at: new Date().toISOString(),
     };
 
@@ -1304,12 +1347,16 @@ export function getStoredBanners(): Banner[] {
   if (typeof window === "undefined") return INITIAL_BANNERS;
   try {
     const raw = localStorage.getItem("abm_stored_banners");
-    if (!raw) return INITIAL_BANNERS;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_BANNERS;
-  } catch {
-    return INITIAL_BANNERS;
-  }
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const deleted = getDeletedSet("abm_deleted_banners");
+        return parsed.filter((b) => !deleted.has(String(b.id)));
+      }
+    }
+  } catch {}
+  const deleted = getDeletedSet("abm_deleted_banners");
+  return INITIAL_BANNERS.filter((b) => !deleted.has(String(b.id)));
 }
 
 export function setStoredBanners(banners: Banner[]): void {
@@ -1322,6 +1369,8 @@ export function setStoredBanners(banners: Banner[]): void {
 
 export async function getBanners(includeInactive = false): Promise<Banner[]> {
   const localBanners = getStoredBanners();
+  const deleted = getDeletedSet("abm_deleted_banners");
+
   try {
     let query = supabase
       .from("banners")
@@ -1331,25 +1380,23 @@ export async function getBanners(includeInactive = false): Promise<Banner[]> {
       query = query.eq("is_active", true);
     }
     const { data, error } = await query;
-    if (!error && data && data.length > 0) {
-      const remoteBanners = data as Banner[];
-      const map = new Map<string, Banner>();
-      remoteBanners.forEach((b) => map.set(String(b.id), b));
-      localBanners.forEach((b) => {
-        if (!map.has(String(b.id))) map.set(String(b.id), b);
-      });
-      const combined = Array.from(map.values()).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-      setStoredBanners(combined);
-      return includeInactive ? combined : combined.filter((b) => b.is_active);
+    if (!error && Array.isArray(data)) {
+      const remoteBanners = (data as Banner[]).filter((b) => !deleted.has(String(b.id)));
+      setStoredBanners(remoteBanners);
+      return includeInactive ? remoteBanners : remoteBanners.filter((b) => b.is_active);
     }
   } catch {}
-  return includeInactive ? localBanners : localBanners.filter((b) => b.is_active);
+
+  const filteredLocal = localBanners.filter((b) => !deleted.has(String(b.id)));
+  return includeInactive ? filteredLocal : filteredLocal.filter((b) => b.is_active);
 }
 
 export async function adminSaveBanner(banner: Partial<Banner>): Promise<{ success: boolean; banner?: Banner; error?: string }> {
   try {
     const banners = getStoredBanners();
     const id = banner.id || `BAN-${Date.now()}`;
+    removeFromDeletedSet("abm_deleted_banners", id);
+
     const cleanBanner: Banner = {
       id,
       title: banner.title || "Promotional Banner",
@@ -1367,7 +1414,7 @@ export async function adminSaveBanner(banner: Partial<Banner>): Promise<{ succes
     }
     setStoredBanners(banners);
 
-    // Sync to Supabase in non-blocking way
+    // Sync to Supabase directly
     try {
       await supabase.from("banners").upsert([
         {
@@ -1381,6 +1428,10 @@ export async function adminSaveBanner(banner: Partial<Banner>): Promise<{ succes
       ]);
     } catch {}
 
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("kb_banners_updated", { detail: banners }));
+    }
+
     return { success: true, banner: cleanBanner };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Banner save failed";
@@ -1390,12 +1441,19 @@ export async function adminSaveBanner(banner: Partial<Banner>): Promise<{ succes
 
 export async function adminDeleteBanner(id: string | number): Promise<{ success: boolean; error?: string }> {
   try {
-    const banners = getStoredBanners().filter((b) => String(b.id) !== String(id));
+    const targetId = String(id);
+    addToDeletedSet("abm_deleted_banners", targetId);
+
+    const banners = getStoredBanners().filter((b) => String(b.id) !== targetId);
     setStoredBanners(banners);
 
     try {
-      await supabase.from("banners").delete().eq("id", id);
+      await supabase.from("banners").delete().eq("id", targetId);
     } catch {}
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("kb_banners_updated", { detail: banners }));
+    }
 
     return { success: true };
   } catch (err: unknown) {
@@ -1638,6 +1696,7 @@ export async function adminSaveProduct(product: Partial<Product>): Promise<{ suc
 export async function adminDeleteProduct(id: string | number): Promise<{ success: boolean; error?: string }> {
   try {
     const target = String(id);
+    addToDeletedSet("abm_deleted_products", target);
     const prods = getStoredProducts().filter((p) => String(p.id) !== target && p.slug !== target);
     setStoredProducts(prods);
 
@@ -1652,6 +1711,40 @@ export async function adminDeleteProduct(id: string | number): Promise<{ success
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Delete failed";
+    return { success: false, error: msg };
+  }
+}
+
+export async function adminDeleteAllProducts(productIds?: (string | number)[]): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (productIds && productIds.length > 0) {
+      const targets = new Set(productIds.map(String));
+      targets.forEach((t) => addToDeletedSet("abm_deleted_products", t));
+      const remaining = getStoredProducts().filter((p) => !targets.has(String(p.id)) && !targets.has(p.slug));
+      setStoredProducts(remaining);
+
+      try {
+        await supabase.from("products").delete().in("id", Array.from(targets));
+      } catch {}
+    } else {
+      const allCurrent = getStoredProducts();
+      allCurrent.forEach((p) => {
+        addToDeletedSet("abm_deleted_products", p.id);
+        if (p.slug) addToDeletedSet("abm_deleted_products", p.slug);
+      });
+      setStoredProducts([]);
+
+      try {
+        await supabase.from("products").delete().neq("id", "0");
+      } catch {}
+    }
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("kb_products_updated"));
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Bulk delete failed";
     return { success: false, error: msg };
   }
 }
@@ -1863,7 +1956,51 @@ export async function adminUpdateOrderHhcDispatch(
     }
     return { success: true };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Dispatch update failed";
+    const msg = err instanceof Error ? err.message : "Update dispatch details failed";
+    return { success: false, error: msg };
+  }
+}
+
+export async function adminUpdateOrder(
+  orderId: string | number,
+  payload: Partial<Order>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const ords = getStoredOrders();
+    const target = String(orderId);
+    const idx = ords.findIndex((o) => String(o.id) === target || o.order_number === target);
+    if (idx >= 0) {
+      ords[idx] = { ...ords[idx], ...payload };
+      setStoredOrders(ords);
+    }
+
+    try {
+      await supabase.from("orders").update(payload).or(`id.eq.${target},order_number.eq.${target}`);
+    } catch {}
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("kb_orders_updated"));
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Update order failed";
+    return { success: false, error: msg };
+  }
+}
+
+export async function adminDeleteAllOrders(): Promise<{ success: boolean; error?: string }> {
+  try {
+    setStoredOrders([]);
+    try {
+      await supabase.from("orders").delete().neq("id", "0");
+    } catch {}
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("kb_orders_updated"));
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Delete all orders failed";
     return { success: false, error: msg };
   }
 }

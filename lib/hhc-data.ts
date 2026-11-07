@@ -11,6 +11,7 @@ export interface HHCSupplier {
   cityName: string;
   hubName: string;
   productsCount: number;
+  category?: string;
 }
 
 export interface HHCCourierCity {
@@ -62,6 +63,7 @@ export const HHC_VERIFIED_SUPPLIERS: HHCSupplier[] = [
     cityName: "Karachi",
     hubName: "Saddar, Karachi Hub",
     productsCount: 30,
+    category: "Stationery & Gifts",
   },
   {
     storeID: 157991,
@@ -69,6 +71,15 @@ export const HHC_VERIFIED_SUPPLIERS: HHCSupplier[] = [
     cityName: "Karachi",
     hubName: "Saddar, Karachi Hub",
     productsCount: 74,
+    category: "Kitchen",
+  },
+  {
+    storeID: 125415,
+    storeName: "Apple",
+    cityName: "Karachi",
+    hubName: "Saddar, Karachi Hub",
+    productsCount: 254,
+    category: "Electronics & Mobile",
   },
   {
     storeID: 158554,
@@ -76,6 +87,7 @@ export const HHC_VERIFIED_SUPPLIERS: HHCSupplier[] = [
     cityName: "Faisalabad",
     hubName: "Faisalabad Central Hub",
     productsCount: 18,
+    category: "Home & Living",
   },
   {
     storeID: 157928,
@@ -83,6 +95,7 @@ export const HHC_VERIFIED_SUPPLIERS: HHCSupplier[] = [
     cityName: "Rawalpindi",
     hubName: "Pindi/ISB Hub",
     productsCount: 14,
+    category: "Beauty & Personal Care",
   },
   {
     storeID: 158628,
@@ -90,6 +103,7 @@ export const HHC_VERIFIED_SUPPLIERS: HHCSupplier[] = [
     cityName: "Faisalabad",
     hubName: "Faisalabad Central Hub",
     productsCount: 12,
+    category: "Health & Fitness",
   },
   {
     storeID: 147340,
@@ -97,13 +111,15 @@ export const HHC_VERIFIED_SUPPLIERS: HHCSupplier[] = [
     cityName: "Karachi",
     hubName: "Saddar, Karachi Hub",
     productsCount: 9,
+    category: "Toys",
   },
   {
     storeID: 158999,
     storeName: "Afara",
     cityName: "Lahore",
-    hubName: "Lahore Hub",
+    hubName: "Lahore Central Hub",
     productsCount: 8,
+    category: "Fashion",
   },
   {
     storeID: 158073,
@@ -111,6 +127,7 @@ export const HHC_VERIFIED_SUPPLIERS: HHCSupplier[] = [
     cityName: "Peshawar",
     hubName: "Peshawar Hub",
     productsCount: 7,
+    category: "Tools & Auto",
   },
   {
     storeID: 158686,
@@ -118,13 +135,95 @@ export const HHC_VERIFIED_SUPPLIERS: HHCSupplier[] = [
     cityName: "Peshawar",
     hubName: "Peshawar Hub",
     productsCount: 5,
+    category: "Baby & Kids",
+  },
+  {
+    storeID: 158855,
+    storeName: "Anvil",
+    cityName: "Karachi",
+    hubName: "Karachi East Hub",
+    productsCount: 15,
+    category: "Tools & Auto",
+  },
+  {
+    storeID: 158472,
+    storeName: "Apex",
+    cityName: "Faisalabad",
+    hubName: "Faisalabad Textile Hub",
+    productsCount: 12,
+    category: "Home & Living",
+  },
+  {
+    storeID: 125544,
+    storeName: "APRICOT",
+    cityName: "Lahore",
+    hubName: "Gulberg, Lahore Hub",
+    productsCount: 16,
+    category: "Fashion",
+  },
+  {
+    storeID: 158684,
+    storeName: "Arbutus",
+    cityName: "Karachi",
+    hubName: "Clifton, Karachi Hub",
+    productsCount: 9,
+    category: "Beauty & Personal Care",
   },
   {
     storeID: 158666,
     storeName: "12w2",
     cityName: "Kot Addu",
-    hubName: "Saddar, Karachi Hub",
-    productsCount: 1,
+    hubName: "South Punjab Hub",
+    productsCount: 8,
+    category: "Beauty & Personal Care",
+  },
+  {
+    storeID: 159101,
+    storeName: "BabyCare Direct",
+    cityName: "Lahore",
+    hubName: "Model Town, Lahore Hub",
+    productsCount: 22,
+    category: "Baby & Kids",
+  },
+  {
+    storeID: 159202,
+    storeName: "KitchenMaster PK",
+    cityName: "Gujranwala",
+    hubName: "Gujranwala Industrial Hub",
+    productsCount: 35,
+    category: "Kitchen",
+  },
+  {
+    storeID: 159303,
+    storeName: "KidsToy Galaxy",
+    cityName: "Multan",
+    hubName: "Multan City Hub",
+    productsCount: 26,
+    category: "Toys",
+  },
+  {
+    storeID: 159404,
+    storeName: "FitnessPro Hub",
+    cityName: "Islamabad",
+    hubName: "Islamabad Express Hub",
+    productsCount: 19,
+    category: "Health & Fitness",
+  },
+  {
+    storeID: 159505,
+    storeName: "LeatherCraft PK",
+    cityName: "Sialkot",
+    hubName: "Sialkot Export Hub",
+    productsCount: 28,
+    category: "Bags & Footwear",
+  },
+  {
+    storeID: 159606,
+    storeName: "PetZone Care",
+    cityName: "Karachi",
+    hubName: "Defence, Karachi Hub",
+    productsCount: 14,
+    category: "Pets & Garden",
   },
 ];
 
