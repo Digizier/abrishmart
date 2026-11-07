@@ -89,22 +89,22 @@ export default function ProductCard({ product, onQuickOrder, onAddToCart }: Prod
             )}
           </div>
 
-          {/* Buttons: 50% Order Now + 50% Add to Cart (Equal Ratio) */}
-          <div className="grid grid-cols-2 gap-1.5 pt-1">
+          {/* Buttons: 50% Order Now + 50% Add to Cart (Equal Ratio - Strict Single Line) */}
+          <div className="grid grid-cols-2 gap-1 pt-1">
             <button
               type="button"
               onClick={() => onQuickOrder(product)}
-              className="w-full bg-brand-pink hover:bg-brand-pinkHover text-white text-[11px] sm:text-xs font-bold py-2 px-1.5 rounded-lg sm:rounded-xl shadow-sm transition active:scale-[0.98] flex items-center justify-center gap-1 truncate"
+              className="w-full bg-brand-pink hover:bg-brand-pinkHover text-white text-[10px] 2xl:text-[11px] font-extrabold py-2 px-1 rounded-lg sm:rounded-xl shadow-xs transition active:scale-[0.98] flex items-center justify-center gap-0.5 whitespace-nowrap overflow-hidden"
             >
-              <Zap className="w-3 h-3 fill-white shrink-0 hidden sm:inline" />
+              <Zap className="w-2.5 h-2.5 fill-white shrink-0 hidden 2xl:inline" />
               <span>Order Now</span>
             </button>
             <button
               type="button"
               onClick={() => onAddToCart(product)}
-              className="w-full bg-slate-100 hover:bg-brand-softPink text-slate-800 hover:text-brand-pink border border-slate-200/80 hover:border-brand-pink/40 text-[11px] sm:text-xs font-bold py-2 px-1.5 rounded-lg sm:rounded-xl transition active:scale-[0.98] flex items-center justify-center gap-1 truncate"
+              className="w-full bg-slate-100 hover:bg-brand-softPink text-slate-800 hover:text-brand-pink border border-slate-200/90 hover:border-brand-pink/40 text-[10px] 2xl:text-[11px] font-extrabold py-2 px-1 rounded-lg sm:rounded-xl transition active:scale-[0.98] flex items-center justify-center gap-0.5 whitespace-nowrap overflow-hidden"
             >
-              <ShoppingBag className="w-3 h-3 shrink-0" />
+              <ShoppingBag className="w-2.5 h-2.5 shrink-0" />
               <span>Add to Cart</span>
             </button>
           </div>

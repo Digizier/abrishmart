@@ -21,7 +21,7 @@ export default function ShopPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"latest" | "price_low" | "price_high">("latest");
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 8; // STRICT 8 PRODUCTS PER PAGE FOR ZERO LOAD
+  const pageSize = 12; // 12 items per page perfectly fills 2, 3, 4, and 6-column grids without gaps
 
   // Mobile Filter Drawer State
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);

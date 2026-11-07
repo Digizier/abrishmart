@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Flame, ArrowRight, Sparkles } from "lucide-react";
 import { Product, Category, Banner } from "@/lib/types";
@@ -18,24 +19,45 @@ export default function HomePage() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [flashDeals, setFlashDeals] = useState<Product[]>([]);
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [categoryProducts, setCategoryProducts] = useState<Record<string, Product[]>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadHomeData(isInitial = false) {
       if (isInitial) setLoading(true);
       try {
-        const [fetchedBanners, fetchedCategories, dealsRes, featuredRes] = await Promise.all([
+        // Ultra-optimized batch fetch: 1 single products query groups all 12 categories in-memory.
+        // Zero extra HTTP requests, never hits Supabase or Cloudflare limits!
+        const [fetchedBanners, fetchedCategories, dealsRes, allProdsRes] = await Promise.all([
           getBanners(),
           getCategories(),
           getProducts({ flashDeals: true, limit: 12 }), // 2 rows of 6 products on desktop
-          getProducts({ limit: 18 }), // Multiple full rows of 6 products on desktop
+          getProducts({ limit: 500 }), // In 1 single query, fetch all catalog products to group in-memory
         ]);
 
         setBanners(fetchedBanners);
         setCategories(fetchedCategories);
-        setFlashDeals(dealsRes.products.slice(0, 12));
-        setFeaturedProducts(featuredRes.products.slice(0, 18));
+
+        // Ensure 12 Flash Deal items (2 full rows of 6 on desktop)
+        let deals = dealsRes.products || [];
+        if (deals.length < 12) {
+          const existingIds = new Set(deals.map((p) => p.id));
+          const fallback = (allProdsRes.products || [])
+            .filter((p) => !existingIds.has(p.id))
+            .slice(0, 12 - deals.length);
+          deals = [...deals, ...fallback];
+        }
+        setFlashDeals(deals.slice(0, 12));
+
+        // Group catalog products by category_slug in memory
+        const grouped: Record<string, Product[]> = {};
+        (allProdsRes.products || []).forEach((p) => {
+          const slug = p.category_slug;
+          if (!slug) return;
+          if (!grouped[slug]) grouped[slug] = [];
+          grouped[slug].push(p);
+        });
+        setCategoryProducts(grouped);
       } catch (err) {
         console.error("Home data fetch error:", err);
       } finally {
@@ -59,6 +81,11 @@ export default function HomePage() {
     };
   }, []);
 
+  // Filter main active categories that strictly have products available
+  const activeMainCategories = categories
+    .filter((c) => !c.parent_slug || c.parent_slug === "")
+    .filter((c) => categoryProducts[c.slug] && categoryProducts[c.slug].length > 0);
+
   return (
     <div className="space-y-6 sm:space-y-10">
       {/* 1. Hero Promotional Banner Hub */}
@@ -67,7 +94,7 @@ export default function HomePage() {
       {/* 2. Top Categories Continuous Marquee */}
       <TopCategoriesMarquee categories={categories} />
 
-      {/* 3. Flash Deals (Strictly Top 4 Products on Homepage) */}
+      {/* 3. Flash Deals (2 Rows of 6 = 12 Products on Desktop, 2 per row on Mobile) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="bg-gradient-to-r from-brand-pink/10 via-rose-50 to-amber-50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-brand-pink/20 shadow-xs">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
@@ -113,55 +140,94 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 4. Trending & Featured Products */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <div>
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-brand-yellow" />
-              <span>Handpicked For You</span>
-            </span>
-            <h2 className="text-lg sm:text-2xl font-black text-slate-900">
-              Popular & Trending in Pakistan
-            </h2>
-          </div>
-          <Link
-            href="/shop"
-            className="text-xs font-bold text-brand-pink hover:text-brand-pinkHover flex items-center gap-1"
-          >
-            <span>View All</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        {loading ? (
+      {/* 4. Dynamic Category Shelves (All Categories with up to 12 products each, strictly hidden if 0 products) */}
+      {loading ? (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 space-y-8">
           <ProductGridSkeleton count={12} />
-        ) : (
-          <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-              {featuredProducts.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onQuickOrder={(p) => openQuickCheckout(p)}
-                  onAddToCart={(p) => addToCart(p)}
-                />
-              ))}
-            </div>
+          <ProductGridSkeleton count={12} />
+        </section>
+      ) : (
+        <div className="space-y-8 sm:space-y-12">
+          {activeMainCategories.map((cat) => {
+            const prods = (categoryProducts[cat.slug] || []).slice(0, 12);
+            if (prods.length === 0) return null;
 
-            {/* Bottom Button: Explore All Products */}
-            <div className="pt-8 text-center">
-              <Link
-                href="/shop"
-                className="inline-flex items-center gap-2 px-8 py-3.5 bg-slate-900 hover:bg-brand-pink text-white text-xs sm:text-sm font-black rounded-2xl shadow-lg transition-all transform hover:-translate-y-0.5"
-              >
-                <span>Explore All Products in Pakistan</span>
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-          </>
-        )}
-      </section>
+            return (
+              <section key={cat.id || cat.slug} className="max-w-7xl mx-auto px-4 sm:px-6">
+                <div className="flex items-center justify-between mb-3 sm:mb-5 pb-2.5 border-b border-slate-200/70">
+                  <div className="flex items-center gap-3">
+                    {cat.image_url && (
+                      <div className="relative w-9 h-9 sm:w-11 sm:h-11 rounded-xl overflow-hidden bg-brand-softPink/60 p-0.5 border border-slate-200/80 shrink-0 shadow-2xs">
+                        <Image
+                          src={cat.image_url}
+                          alt={cat.name}
+                          fill
+                          sizes="44px"
+                          className="object-cover rounded-lg"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base sm:text-xl font-black text-slate-900 tracking-tight">
+                          {cat.name}
+                        </h2>
+                        <span className="text-[10px] sm:text-[11px] font-extrabold text-brand-pink bg-brand-softPink/70 px-2 py-0.5 rounded-full">
+                          {(categoryProducts[cat.slug] || []).length} Items
+                        </span>
+                      </div>
+                      {cat.subcategories && cat.subcategories.length > 0 && (
+                        <div className="hidden sm:flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
+                          {cat.subcategories.slice(0, 4).map((sub) => (
+                            <Link
+                              key={sub.id}
+                              href={`/category/?slug=${cat.slug}&sub=${sub.slug}`}
+                              className="hover:text-brand-pink transition"
+                            >
+                              {sub.name}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <Link
+                    href={`/category/?slug=${cat.slug}`}
+                    className="text-xs font-bold text-brand-pink hover:text-brand-pinkHover flex items-center gap-1 group bg-white px-3 py-1.5 rounded-xl border border-brand-pink/20 shadow-2xs hover:shadow-xs transition shrink-0"
+                  >
+                    <span>View All</span>
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
+                  </Link>
+                </div>
+
+                {/* 6 Columns Desktop (2 full rows = 12 items), 2 Columns Mobile */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                  {prods.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onQuickOrder={(p) => openQuickCheckout(p)}
+                      onAddToCart={(p) => addToCart(p)}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+
+          {/* Bottom Button: Explore All Products */}
+          <div className="pt-4 text-center">
+            <Link
+              href="/shop"
+              className="inline-flex items-center gap-2 px-8 py-3.5 bg-slate-900 hover:bg-brand-pink text-white text-xs sm:text-sm font-black rounded-2xl shadow-lg transition-all transform hover:-translate-y-0.5"
+            >
+              <span>Explore All Products in Pakistan</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* 5. Authorized Brands & Genuine Quality Marquee */}
       <BrandsMarquee />

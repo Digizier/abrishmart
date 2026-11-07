@@ -25,6 +25,69 @@ interface HeaderProps {
   cartCount?: number;
 }
 
+function HeaderCategoryTicker({ categories }: { categories: Category[] }) {
+  const tickerRef = useRef<HTMLDivElement>(null);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // Filter only main active categories
+  const mainCats = categories.filter((c) => !c.parent_slug || c.parent_slug === "");
+
+  useEffect(() => {
+    const el = tickerRef.current;
+    if (!el || mainCats.length === 0) return;
+
+    let animId: number;
+    const speed = 0.6; // smooth gentle speed
+
+    const step = () => {
+      if (!isPaused && el) {
+        el.scrollLeft += speed;
+        // When scrolled halfway through the duplicate list, reset to 0
+        if (el.scrollLeft >= el.scrollWidth / 2) {
+          el.scrollLeft = 0;
+        }
+      }
+      animId = requestAnimationFrame(step);
+    };
+
+    animId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animId);
+  }, [isPaused, mainCats]);
+
+  if (mainCats.length === 0) return null;
+
+  // Duplicate items for seamless continuous looping (from end back to 1)
+  const list = [...mainCats, ...mainCats];
+
+  return (
+    <div
+      className="relative flex-1 min-w-0 max-w-2xl mx-2 overflow-hidden"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
+      {/* Subtle edge fade masks */}
+      <div className="absolute left-0 top-0 bottom-0 w-3 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 bottom-0 w-3 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
+
+      <div
+        ref={tickerRef}
+        className="flex items-center gap-3 overflow-x-hidden whitespace-nowrap scroll-smooth no-scrollbar py-0.5"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        {list.map((cat, idx) => (
+          <Link
+            key={`${cat.slug}-${idx}`}
+            href={`/category/?slug=${cat.slug}`}
+            className="text-slate-700 hover:text-brand-pink font-semibold text-xs transition px-2 py-1 rounded-lg hover:bg-brand-softPink/60 shrink-0 flex items-center gap-1"
+          >
+            <span>{cat.name}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -267,9 +330,9 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
             DESKTOP NAVIGATION ROW WITH DARAZ-STYLE MEGA MENU & FLASH SALE
         ========================================================= */}
         <nav className="hidden md:flex items-center justify-between border-t border-slate-100 py-2 text-xs font-semibold text-slate-700 relative">
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 flex-1 min-w-0 mr-4">
             {/* 1. All Categories Dropdown Button (Daraz Mega-Menu Trigger) */}
-            <div ref={megaMenuRef} className="relative">
+            <div ref={megaMenuRef} className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setMegaMenuOpen(!megaMenuOpen)}
@@ -399,27 +462,20 @@ export default function Header({ onOpenCart, cartCount = 0 }: HeaderProps) {
               )}
             </div>
 
-            {/* 2. Direct Primary Category Links (Synced with Admin Categories) */}
-            <Link href="/" className="hover:text-brand-pink transition font-bold text-slate-900">
+            {/* 2. Direct Primary Category Links & Animated Continuous Ticker */}
+            <Link href="/" className="hover:text-brand-pink transition font-bold text-slate-900 shrink-0">
               Home
             </Link>
-            <Link href="/shop" className="hover:text-brand-pink transition">
+            <Link href="/shop" className="hover:text-brand-pink transition shrink-0 font-medium text-slate-700">
               All Products
             </Link>
 
-            {categories.slice(0, 4).map((cat) => (
-              <Link
-                key={cat.id}
-                href={`/category/?slug=${cat.slug}`}
-                className="hover:text-brand-pink transition truncate max-w-[150px]"
-              >
-                {cat.name}
-              </Link>
-            ))}
+            {/* Seamless Auto-Scrolling Category Marquee (Pauses on Hover, Loops Infinitely) */}
+            <HeaderCategoryTicker categories={categories} />
           </div>
 
           {/* Right Action: FLASH SALE Active Highlighted Button */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 shrink-0">
             <Link
               href="/flash-deals"
               className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-rose-600 via-brand-pink to-amber-500 text-white rounded-full font-black text-xs shadow-md shadow-brand-pink/20 hover:scale-105 transition group"

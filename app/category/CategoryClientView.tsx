@@ -17,7 +17,7 @@ export default function CategoryClientView({ slug }: { slug: string }) {
   const [categoryName, setCategoryName] = useState("Category");
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 8; // STRICT 8 PRODUCTS PER PAGE
+  const pageSize = 12; // 12 products perfectly fills two full 6-column rows on desktop
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
