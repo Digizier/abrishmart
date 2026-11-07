@@ -16,7 +16,7 @@ export default function Footer() {
               <Truck className="w-8 h-8 text-brand-yellow shrink-0" />
               <div>
                 <h4 className="text-white font-bold text-xs sm:text-sm">Free Delivery</h4>
-                <p className="text-[11px] text-slate-400">On all orders above Rs. 2,500</p>
+                <p className="text-[11px] text-slate-400">Above Rs. 2,500 — Allow to Open</p>
               </div>
             </div>
 
@@ -24,7 +24,7 @@ export default function Footer() {
               <ShieldCheck className="w-8 h-8 text-emerald-400 shrink-0" />
               <div>
                 <h4 className="text-white font-bold text-xs sm:text-sm">Cash on Delivery</h4>
-                <p className="text-[11px] text-slate-400">Pay when your parcel arrives</p>
+                <p className="text-[11px] text-slate-400">Order in 1 Click • Allow to Open • Fast Courier Dispatch</p>
               </div>
             </div>
 
@@ -153,9 +153,14 @@ export default function Footer() {
               </li>
               <li className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-brand-pink shrink-0" />
-                <a href="mailto:usmanshah11@gmail.com" className="hover:text-white transition">
-                  usmanshah11@gmail.com
-                </a>
+                <div className="flex flex-col">
+                  <a href="mailto:abrishmart@gmail.com" className="hover:text-white transition">
+                    abrishmart@gmail.com
+                  </a>
+                  <a href="mailto:usmanshah11@gmail.com" className="hover:text-white transition text-slate-400">
+                    usmanshah11@gmail.com
+                  </a>
+                </div>
               </li>
               <li className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-brand-yellow shrink-0" />
@@ -172,11 +177,11 @@ export default function Footer() {
                 <span className="bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded">
                   Cash on Delivery (COD)
                 </span>
-                <span className="bg-rose-950 text-rose-300 border border-rose-800 px-2 py-0.5 rounded">
-                  JazzCash
-                </span>
                 <span className="bg-teal-950 text-teal-300 border border-teal-800 px-2 py-0.5 rounded">
                   EasyPaisa
+                </span>
+                <span className="bg-orange-950 text-orange-300 border border-orange-800 px-2 py-0.5 rounded">
+                  Raast ID (03452086160)
                 </span>
                 <span className="bg-sky-950 text-sky-300 border border-sky-800 px-2 py-0.5 rounded">
                   Bank Transfer

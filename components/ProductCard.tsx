@@ -89,22 +89,23 @@ export default function ProductCard({ product, onQuickOrder, onAddToCart }: Prod
             )}
           </div>
 
-          {/* Buttons: Order Now (Primary) + Cart (Secondary) */}
-          <div className="grid grid-cols-[1fr_auto] gap-1.5">
+          {/* Buttons: 50% Order Now + 50% Add to Cart (Equal Ratio) */}
+          <div className="grid grid-cols-2 gap-1.5 pt-1">
             <button
               type="button"
               onClick={() => onQuickOrder(product)}
-              className="bg-brand-pink hover:bg-brand-pinkHover text-white text-[11px] sm:text-xs font-bold py-2 px-2.5 rounded-lg sm:rounded-xl shadow-sm transition active:scale-[0.98] truncate"
+              className="w-full bg-brand-pink hover:bg-brand-pinkHover text-white text-[11px] sm:text-xs font-bold py-2 px-1.5 rounded-lg sm:rounded-xl shadow-sm transition active:scale-[0.98] flex items-center justify-center gap-1 truncate"
             >
-              Order Now
+              <Zap className="w-3 h-3 fill-white shrink-0 hidden sm:inline" />
+              <span>Order Now</span>
             </button>
             <button
               type="button"
               onClick={() => onAddToCart(product)}
-              className="p-2 rounded-lg sm:rounded-xl bg-slate-100 hover:bg-brand-softPink text-slate-700 hover:text-brand-pink transition"
-              title="Add to Cart"
+              className="w-full bg-slate-100 hover:bg-brand-softPink text-slate-800 hover:text-brand-pink border border-slate-200/80 hover:border-brand-pink/40 text-[11px] sm:text-xs font-bold py-2 px-1.5 rounded-lg sm:rounded-xl transition active:scale-[0.98] flex items-center justify-center gap-1 truncate"
             >
-              <ShoppingBag className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <ShoppingBag className="w-3 h-3 shrink-0" />
+              <span>Add to Cart</span>
             </button>
           </div>
         </div>

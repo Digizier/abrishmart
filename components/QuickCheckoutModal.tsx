@@ -249,7 +249,7 @@ export default function QuickCheckoutModal({
               <span>Delivery Charges:</span>
               <span>
                 {deliveryCharges === 0 ? (
-                  <strong className="text-emerald-600 uppercase font-bold">FREE (Spent &gt; Rs. 2,500)</strong>
+                  <strong className="text-emerald-600 uppercase font-bold">FREE</strong>
                 ) : (
                   <strong className="text-slate-900 font-semibold">Rs. {deliveryCharges}</strong>
                 )}

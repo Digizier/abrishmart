@@ -79,7 +79,7 @@ export interface Order {
   discount: number;
   discount_code?: string;
   total_amount: number;
-  payment_method: "cod" | "jazzcash" | "easypaisa" | "bank";
+  payment_method: "cod" | "jazzcash" | "easypaisa" | "bank" | "raast";
   payment_status: "pending" | "verified" | "rejected";
   payment_proof_url?: string | null;
   status: "Pending" | "Confirmed" | "Processing" | "Shipped" | "Delivered" | "Cancelled";

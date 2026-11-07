@@ -25,7 +25,7 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
 
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "jazzcash" | "easypaisa" | "bank">("cod");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "jazzcash" | "easypaisa" | "bank" | "raast">("cod");
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [uploadingProof, setUploadingProof] = useState(false);
 
@@ -284,25 +284,7 @@ export default function CheckoutPage() {
                   </div>
                 </label>
 
-                <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${
-                  paymentMethod === "jazzcash" ? "border-brand-pink bg-brand-softPink" : "border-slate-200 hover:bg-slate-50"
-                }`}>
-                  <input
-                    type="radio"
-                    name="payment"
-                    checked={paymentMethod === "jazzcash"}
-                    onChange={() => setPaymentMethod("jazzcash")}
-                    className="text-brand-pink focus:ring-brand-pink"
-                  />
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">JazzCash (Advance Transfer)</p>
-                    <p className="text-[11px] text-slate-500">
-                      Account: {siteSettings?.jazzcash_number || "0345-2086160"} ({siteSettings?.jazzcash_title || "Usman Shah"})
-                    </p>
-                  </div>
-                </label>
-
-                <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                <label className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition ${
                   paymentMethod === "easypaisa" ? "border-brand-pink bg-brand-softPink" : "border-slate-200 hover:bg-slate-50"
                 }`}>
                   <input
@@ -313,9 +295,33 @@ export default function CheckoutPage() {
                     className="text-brand-pink focus:ring-brand-pink"
                   />
                   <div>
-                    <p className="text-xs font-bold text-slate-900">EasyPaisa (Advance Transfer)</p>
-                    <p className="text-[11px] text-slate-500">
-                      Account: {siteSettings?.easypaisa_number || "0345-2086160"} ({siteSettings?.easypaisa_title || "Usman Shah"})
+                    <p className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span>EasyPaisa (Advance Transfer)</span>
+                    </p>
+                    <p className="text-[11px] text-slate-600 font-medium mt-0.5">
+                      Account Title: <strong className="text-slate-900">syed usman hassan</strong> | Number: <strong className="text-slate-900 font-mono">03452086160</strong>
+                    </p>
+                  </div>
+                </label>
+
+                <label className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition ${
+                  paymentMethod === "raast" ? "border-brand-pink bg-brand-softPink" : "border-slate-200 hover:bg-slate-50"
+                }`}>
+                  <input
+                    type="radio"
+                    name="payment"
+                    checked={paymentMethod === "raast"}
+                    onChange={() => setPaymentMethod("raast")}
+                    className="text-brand-pink focus:ring-brand-pink"
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-orange-500" />
+                      <span>Raast ID (Instant Bank / Wallet Transfer)</span>
+                    </p>
+                    <p className="text-[11px] text-slate-600 font-medium mt-0.5">
+                      Account Title: <strong className="text-slate-900">syed usman hassan</strong> | Raast ID: <strong className="text-slate-900 font-mono">03452086160</strong>
                     </p>
                   </div>
                 </label>

@@ -18,6 +18,7 @@ import {
   Sparkles,
   FileText,
   Check,
+  Copy,
 } from "lucide-react";
 import { Product } from "@/lib/types";
 import { getProductBySlug, getProducts } from "@/lib/db";
@@ -58,6 +59,14 @@ function isHtmlContent(str: string): boolean {
   return /<[a-z][\s\S]*>/i.test(str || "");
 }
 
+function WhatsAppIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12.031 2C6.495 2 2 6.495 2 12.031c0 1.908.536 3.693 1.467 5.216L2 22l4.908-1.434A9.973 9.973 0 0 0 12.031 22c5.536 0 10.031-4.495 10.031-10.031S17.567 2 12.031 2zm5.828 14.195c-.244.686-1.42 1.31-1.956 1.391-.497.075-1.144.107-1.849-.118a14.774 14.774 0 0 1-5.187-3.238 11.233 11.233 0 0 1-2.348-3.52c-.595-1.026-.063-1.58.204-1.845.24-.239.531-.301.708-.306.177-.005.354 0 .509.009.165.009.387-.063.606.463.227.545.772 1.884.84 2.02.068.136.113.295.023.473-.091.177-.136.286-.272.445-.136.159-.286.354-.408.477-.136.136-.277.286-.118.558.159.272.709 1.168 1.523 1.895 1.045.932 1.927 1.223 2.2 1.359.272.136.431.118.59-.068.16-.186.682-.795.864-1.068.181-.272.363-.227.613-.136.25.091 1.59.75 1.863.886.273.136.454.205.523.318.068.114.068.659-.176 1.345z" />
+    </svg>
+  );
+}
+
 export default function ProductDetailClientView({ slug }: { slug: string }) {
   const { openQuickCheckout, addToCart } = useCart();
 
@@ -68,6 +77,7 @@ export default function ProductDetailClientView({ slug }: { slug: string }) {
   const [selectedColor, setSelectedColor] = useState<string>("");
   const [quantity, setQuantity] = useState<number>(1);
   const [loading, setLoading] = useState(true);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
     async function loadProduct() {
@@ -83,8 +93,8 @@ export default function ProductDetailClientView({ slug }: { slug: string }) {
           setSelectedColor(prod.variations.colors[0]);
         }
 
-        // Fetch related products from same category
-        const rel = await getProducts({ category: prod.category_slug, limit: 4 });
+        // Fetch related products from same category (up to 12 for 6-per-row desktop layout)
+        const rel = await getProducts({ category: prod.category_slug, limit: 12 });
         setRelated(rel.products.filter((p) => p.slug !== prod.slug));
       }
       setLoading(false);
@@ -135,6 +145,36 @@ export default function ProductDetailClientView({ slug }: { slug: string }) {
   const whatsappEnquiryText = encodeURIComponent(
     `Salam Usman Bhai, I want to inquire about "${product.title}" (SKU: ${product.sku || "N/A"}) on Abrish Mart.`
   );
+
+  const handleCopyLink = () => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(productUrl);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+    }
+  };
+
+  const handleWhatsAppOrder = () => {
+    const totalAmount = (product.price * quantity).toLocaleString();
+    const variantParts = [
+      selectedSize ? `Size: ${selectedSize}` : "",
+      selectedColor ? `Color: ${selectedColor}` : "",
+    ].filter(Boolean);
+    const variantText = variantParts.length > 0 ? `\n🎨 *Selected Option:* ${variantParts.join(", ")}` : "";
+
+    const msg =
+      `*Assalam-o-Alaikum Abrish Mart!* 🛍️\n` +
+      `I want to place an order via WhatsApp Cash on Delivery:\n\n` +
+      `📦 *Product:* ${product.title}\n` +
+      `🔢 *SKU/Code:* ${product.sku || product.id}\n` +
+      `💰 *Price:* Rs. ${product.price.toLocaleString()} x ${quantity} = *Rs. ${totalAmount}*` +
+      variantText + `\n` +
+      `🔗 *Product Link:* ${productUrl}\n\n` +
+      `🚚 *Payment Method:* Cash on Delivery (COD)\n` +
+      `Please confirm my order and share estimated delivery time. JazakAllah!`;
+
+    window.open(`https://wa.me/923452086160?text=${encodeURIComponent(msg)}`, "_blank");
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-12">
@@ -325,19 +365,32 @@ export default function ProductDetailClientView({ slug }: { slug: string }) {
             </span>
           </div>
 
-          {/* TWO PROMINENT BUTTONS: ORDER NOW (Primary) & ADD TO CART (Secondary) */}
+          {/* THREE PROMINENT BUTTONS: WHATSAPP ORDER NOW + QUICK ORDER + ADD TO CART */}
           <div className="space-y-2.5 pt-2">
-            {/* Primary: Quick Checkout Button */}
+            {/* 1. WHATSAPP ORDER NOW (Prominent Official Green) */}
+            <button
+              type="button"
+              onClick={handleWhatsAppOrder}
+              className="w-full bg-[#25D366] hover:bg-[#20ba5a] text-white font-black text-sm py-4 px-6 rounded-2xl shadow-xl shadow-[#25D366]/30 flex items-center justify-center gap-2.5 transition active:scale-[0.99] group"
+            >
+              <WhatsAppIcon className="w-5 h-5 fill-white shrink-0 group-hover:scale-110 transition-transform" />
+              <span className="tracking-wide">WHATSAPP ORDER NOW</span>
+              <span className="hidden sm:inline bg-black/20 text-white text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full ml-1">
+                Direct Chat
+              </span>
+            </button>
+
+            {/* 2. Primary: Quick Checkout Button */}
             <button
               type="button"
               onClick={() => openQuickCheckout(product, selectedSize, selectedColor)}
-              className="w-full bg-gradient-to-r from-brand-pink to-rose-600 hover:from-brand-pinkHover hover:to-rose-700 text-white font-black text-sm py-4 px-6 rounded-2xl shadow-xl shadow-brand-pink/30 flex items-center justify-center gap-2 transition active:scale-[0.99]"
+              className="w-full bg-gradient-to-r from-brand-pink to-rose-600 hover:from-brand-pinkHover hover:to-rose-700 text-white font-black text-sm py-3.5 px-6 rounded-2xl shadow-lg shadow-brand-pink/25 flex items-center justify-center gap-2 transition active:scale-[0.99]"
             >
               <Zap className="w-5 h-5 fill-brand-yellow text-brand-yellow" />
               <span>ORDER NOW — CASH ON DELIVERY</span>
             </button>
 
-            {/* Secondary: Add to Cart Button */}
+            {/* 3. Secondary: Add to Cart Button */}
             <button
               type="button"
               onClick={() => addToCart(product, selectedSize, selectedColor, quantity)}
@@ -368,38 +421,72 @@ export default function ProductDetailClientView({ slug }: { slug: string }) {
             </div>
           </div>
 
-          {/* Social Share & WhatsApp Enquiry */}
-          <div className="pt-2 flex flex-wrap items-center justify-between gap-3 text-xs border-t border-slate-100">
-            <div className="flex items-center gap-2 text-slate-500">
-              <Share2 className="w-4 h-4" />
-              <span className="font-semibold">Share Product:</span>
+          {/* Enhanced Social Share Component: Copy Link, WhatsApp, Facebook, X, Pinterest */}
+          <div className="pt-3 flex flex-wrap items-center justify-between gap-2 text-xs border-t border-slate-100">
+            <div className="flex items-center gap-2 text-slate-600 flex-wrap">
+              <Share2 className="w-4 h-4 text-slate-700 mr-0.5 shrink-0" />
+              <span className="font-bold text-slate-800">Share Product:</span>
+
+              {/* Copy Link */}
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+                  linkCopied
+                    ? "bg-emerald-600 text-white"
+                    : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                }`}
+                title="Copy product link"
+              >
+                {linkCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{linkCopied ? "Link Copied!" : "Copy Link"}</span>
+              </button>
+
+              {/* WhatsApp Share */}
               <a
                 href={`https://wa.me/?text=${whatsappShareText}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2 py-1 rounded font-bold transition"
+                className="bg-[#25D366]/10 text-[#128C7E] hover:bg-[#25D366]/20 px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 transition"
+                title="Share on WhatsApp"
               >
-                WhatsApp
+                <WhatsAppIcon className="w-3.5 h-3.5 fill-[#25D366]" />
+                <span>WhatsApp</span>
               </a>
+
+              {/* Facebook Share */}
               <a
                 href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(productUrl)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-1 rounded font-bold transition"
+                className="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2.5 py-1 rounded-lg font-bold text-[11px] transition"
+                title="Share on Facebook"
               >
                 Facebook
               </a>
-            </div>
 
-            <a
-              href={`https://wa.me/923452086160?text=${whatsappEnquiryText}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-emerald-700 font-bold hover:underline"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>Ask Usman on WhatsApp</span>
-            </a>
+              {/* Twitter / X */}
+              <a
+                href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(productUrl)}&text=${encodeURIComponent(`Check out ${product.title} on Abrish Mart:`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-slate-900 text-white hover:bg-black px-2.5 py-1 rounded-lg font-bold text-[11px] transition"
+                title="Share on Twitter / X"
+              >
+                X (Twitter)
+              </a>
+
+              {/* Pinterest */}
+              <a
+                href={`https://pinterest.com/pin/create/button/?url=${encodeURIComponent(productUrl)}&media=${encodeURIComponent(product.thumbnail_url)}&description=${encodeURIComponent(product.title)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-rose-50 text-rose-700 hover:bg-rose-100 px-2.5 py-1 rounded-lg font-bold text-[11px] transition"
+                title="Share on Pinterest"
+              >
+                Pinterest
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -497,7 +584,7 @@ export default function ProductDetailClientView({ slug }: { slug: string }) {
           <h3 className="text-lg sm:text-2xl font-black text-slate-900 mb-4 sm:mb-6">
             Frequently Bought Together / Related Products
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
             {related.map((prod) => (
               <ProductCard
                 key={prod.id}

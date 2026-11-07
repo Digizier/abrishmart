@@ -28,14 +28,14 @@ export default function HomePage() {
         const [fetchedBanners, fetchedCategories, dealsRes, featuredRes] = await Promise.all([
           getBanners(),
           getCategories(),
-          getProducts({ flashDeals: true, limit: 4 }), // Strictly top 4 flash deals
-          getProducts({ limit: 8 }), // Strictly 8 products on homepage
+          getProducts({ flashDeals: true, limit: 12 }), // 2 rows of 6 products on desktop
+          getProducts({ limit: 18 }), // Multiple full rows of 6 products on desktop
         ]);
 
         setBanners(fetchedBanners);
         setCategories(fetchedCategories);
-        setFlashDeals(dealsRes.products.slice(0, 4));
-        setFeaturedProducts(featuredRes.products.slice(0, 8));
+        setFlashDeals(dealsRes.products.slice(0, 12));
+        setFeaturedProducts(featuredRes.products.slice(0, 18));
       } catch (err) {
         console.error("Home data fetch error:", err);
       } finally {
@@ -97,9 +97,9 @@ export default function HomePage() {
           </div>
 
           {loading ? (
-            <ProductGridSkeleton count={4} />
+            <ProductGridSkeleton count={12} />
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
               {flashDeals.map((product) => (
                 <ProductCard
                   key={product.id}
@@ -113,7 +113,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 4. Trending & Featured Products (Strictly 8 Products on Homepage) */}
+      {/* 4. Trending & Featured Products */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <div>
@@ -135,10 +135,10 @@ export default function HomePage() {
         </div>
 
         {loading ? (
-          <ProductGridSkeleton count={8} />
+          <ProductGridSkeleton count={12} />
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
               {featuredProducts.map((product) => (
                 <ProductCard
                   key={product.id}

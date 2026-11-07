@@ -6,243 +6,585 @@ import { Product, Category, Subcategory, Order, Banner, SiteSettings, Coupon } f
 // ==========================================
 export const INITIAL_CATEGORIES: Category[] = [
   {
-    id: 1,
-    name: "Bridal Silk & Nightwear",
-    slug: "bridal-silk-nightwear",
-    image_url: "/images/categories/bridal-silk.webp",
+    id: "CAT-1",
+    name: "Kitchen",
+    slug: "kitchen",
+    image_url: "/images/categories/kitchen.webp",
     show_on_homepage: true,
     sort_order: 1,
     subcategories: [
       {
         id: 101,
-        name: "Bridal Nighty Gowns",
-        slug: "bridal-nighty-gowns",
-        parent_slug: "bridal-silk-nightwear",
+        name: "Cookware & Bakeware",
+        slug: "cookware-bakeware",
+        parent_slug: "kitchen",
         child_subcategories: [
-          { id: 1001, name: "2-Piece Silk Gown Sets", slug: "2-piece-silk-sets" },
-          { id: 1002, name: "Embroidered Lace Gowns", slug: "embroidered-lace-gowns" },
-          { id: 1003, name: "Luxury Bridal Nightwear", slug: "luxury-bridal-nightwear" },
-        ],
+          { id: 1001, name: "Non-Stick Frying Pans", slug: "non-stick-frying-pans" },
+          { id: 1002, name: "Pressure Cookers & Pots", slug: "pressure-cookers-pots" },
+          { id: 1003, name: "Baking Moulds & Trays", slug: "baking-moulds-trays" }
+        ]
       },
       {
         id: 102,
-        name: "Satin Robes & Kimonos",
-        slug: "satin-robes-kimonos",
-        parent_slug: "bridal-silk-nightwear",
+        name: "Kitchen Appliances",
+        slug: "kitchen-appliances",
+        parent_slug: "kitchen",
         child_subcategories: [
-          { id: 1004, name: "Silk Kimono Bathrobes", slug: "silk-kimono-bathrobes" },
-          { id: 1005, name: "Satin Dressing Robes", slug: "satin-dressing-robes" },
-        ],
+          { id: 1004, name: "Blenders & Food Processors", slug: "blenders-food-processors" },
+          { id: 1005, name: "Electric Choppers & Slicers", slug: "electric-choppers-slicers" },
+          { id: 1006, name: "Electric Kettles & Dispensers", slug: "electric-kettles-dispensers" }
+        ]
       },
       {
         id: 103,
-        name: "Comfort Sleepwear",
-        slug: "comfort-sleepwear",
-        parent_slug: "bridal-silk-nightwear",
+        name: "Kitchen Storage & Organizers",
+        slug: "kitchen-storage-organizers",
+        parent_slug: "kitchen",
         child_subcategories: [
-          { id: 1006, name: "Silk Pajama Sets", slug: "silk-pajama-sets" },
-          { id: 1007, name: "Soft Cotton Sleep Dresses", slug: "cotton-sleep-dresses" },
-        ],
+          { id: 1007, name: "Spice Racks & Jars", slug: "spice-racks-jars" },
+          { id: 1008, name: "Airtight Food Containers", slug: "airtight-food-containers" },
+          { id: 1009, name: "Dish Drying Racks", slug: "dish-drying-racks" }
+        ]
       },
-    ],
+      {
+        id: 104,
+        name: "Cutlery & Prep Tools",
+        slug: "cutlery-prep-tools",
+        parent_slug: "kitchen",
+        child_subcategories: [
+          { id: 1010, name: "Chef Knife Sets", slug: "chef-knife-sets" },
+          { id: 1011, name: "Peelers, Graters & Mashers", slug: "peelers-graters-mashers" }
+        ]
+      }
+    ]
   },
   {
-    id: 2,
-    name: "Kids & Educational Toys",
-    slug: "kids-educational-toys",
-    image_url: "/images/categories/kids-toys.webp",
+    id: "CAT-2",
+    name: "Toys",
+    slug: "toys",
+    image_url: "/images/categories/toys.webp",
     show_on_homepage: true,
     sort_order: 2,
     subcategories: [
       {
         id: 201,
-        name: "Montessori Learning",
-        slug: "montessori-learning",
-        parent_slug: "kids-educational-toys",
+        name: "Educational & STEM Toys",
+        slug: "educational-stem-toys",
+        parent_slug: "toys",
         child_subcategories: [
-          { id: 2001, name: "Phonetic Learning Tablets", slug: "phonetic-learning-tablets" },
-          { id: 2002, name: "Wooden Puzzle Blocks", slug: "wooden-puzzle-blocks" },
-          { id: 2003, name: "Flashcards & Math Cards", slug: "flashcards-math-cards" },
-        ],
+          { id: 2001, name: "Wooden Puzzle Blocks", slug: "wooden-puzzle-blocks" },
+          { id: 2002, name: "Learning Tablets & Boards", slug: "learning-tablets-boards" },
+          { id: 2003, name: "Flashcards & Math Games", slug: "flashcards-math-games" }
+        ]
       },
       {
         id: 202,
-        name: "Creative Art & Drawing",
-        slug: "creative-art-drawing",
-        parent_slug: "kids-educational-toys",
+        name: "Remote Control & Vehicles",
+        slug: "rc-vehicles",
+        parent_slug: "toys",
         child_subcategories: [
-          { id: 2004, name: "54 Pcs Art Studio Kits", slug: "54-pcs-art-studio-kits" },
-          { id: 2005, name: "Smiley Cartoon Pencils", slug: "smiley-cartoon-pencils" },
-          { id: 2006, name: "Bendy Flexible Magic Pencils", slug: "bendy-flexible-pencils" },
-        ],
+          { id: 2004, name: "RC Cars & Stunt Vehicles", slug: "rc-cars-stunt-vehicles" },
+          { id: 2005, name: "Toy Helicopters & Drones", slug: "toy-helicopters-drones" }
+        ]
       },
       {
         id: 203,
-        name: "Fun Stamps & Games",
-        slug: "fun-stamps-games",
-        parent_slug: "kids-educational-toys",
+        name: "Action Figures & Dolls",
+        slug: "action-figures-dolls",
+        parent_slug: "toys",
         child_subcategories: [
-          { id: 2007, name: "Self-Inking Emoji Stamps", slug: "emoji-stamp-sets" },
-          { id: 2008, name: "Birthday Return Gifts", slug: "birthday-return-gifts" },
-        ],
+          { id: 2006, name: "Superhero Figures", slug: "superhero-figures" },
+          { id: 2007, name: "Fashion Dolls & Dollhouses", slug: "fashion-dolls-dollhouses" }
+        ]
       },
-    ],
+      {
+        id: 204,
+        name: "Musical & Sensory Toys",
+        slug: "musical-sensory-toys",
+        parent_slug: "toys",
+        child_subcategories: [
+          { id: 2008, name: "Kids Toy Guitars & Pianos", slug: "kids-guitars-pianos" },
+          { id: 2009, name: "Bubble Guns & Light Guns", slug: "bubble-guns-light-guns" }
+        ]
+      }
+    ]
   },
   {
-    id: 3,
-    name: "Fashion & Watches",
-    slug: "fashion-watches",
-    image_url: "/images/categories/fashion-watches.webp",
+    id: "CAT-3",
+    name: "Fashion",
+    slug: "fashion",
+    image_url: "/images/categories/fashion.webp",
     show_on_homepage: true,
     sort_order: 3,
     subcategories: [
       {
         id: 301,
-        name: "Men's Luxury Watches",
-        slug: "mens-luxury-watches",
-        parent_slug: "fashion-watches",
+        name: "Women's Clothing & Nightwear",
+        slug: "womens-clothing-nightwear",
+        parent_slug: "fashion",
         child_subcategories: [
-          { id: 3001, name: "Chronograph Quartz Watches", slug: "chronograph-quartz-watches" },
-          { id: 3002, name: "Genuine Leather Strap Dials", slug: "leather-strap-dials" },
-          { id: 3003, name: "Waterproof Stainless Steel", slug: "waterproof-stainless-steel" },
-        ],
+          { id: 3001, name: "Bridal Silk Nighty Gowns", slug: "bridal-nighty-gowns" },
+          { id: 3002, name: "Satin Robes & Kimonos", slug: "satin-robes-kimonos" },
+          { id: 3003, name: "Pret Kurtis & Stitched Suits", slug: "pret-kurtis-stitched-suits" }
+        ]
       },
       {
         id: 302,
-        name: "Women's Timepieces",
-        slug: "womens-timepieces",
-        parent_slug: "fashion-watches",
+        name: "Men's Apparel",
+        slug: "mens-apparel",
+        parent_slug: "fashion",
         child_subcategories: [
-          { id: 3004, name: "Rose Gold Bracelet Watches", slug: "rose-gold-bracelet-watches" },
-          { id: 3005, name: "Magnetic Strap Dials", slug: "magnetic-strap-dials" },
-        ],
+          { id: 3004, name: "Casual T-Shirts & Polos", slug: "casual-tshirts-polos" },
+          { id: 3005, name: "Tracksuits & Loungewear", slug: "tracksuits-loungewear" }
+        ]
       },
       {
         id: 303,
-        name: "Wallets & Accessories",
-        slug: "wallets-accessories",
-        parent_slug: "fashion-watches",
+        name: "Watches & Accessories",
+        slug: "watches-accessories",
+        parent_slug: "fashion",
         child_subcategories: [
-          { id: 3006, name: "Men's Slim Wallets", slug: "mens-slim-wallets" },
-          { id: 3007, name: "Cosmetic & Beauty Accessories", slug: "beauty-accessories" },
-        ],
+          { id: 3006, name: "Men's Chronograph Watches", slug: "mens-chronograph-watches" },
+          { id: 3007, name: "Women's Luxury Watches", slug: "womens-luxury-watches" },
+          { id: 3008, name: "Sunglasses & Belts", slug: "sunglasses-belts" }
+        ]
       },
-    ],
+      {
+        id: 304,
+        name: "Jewelry & Ornaments",
+        slug: "jewelry-ornaments",
+        parent_slug: "fashion",
+        child_subcategories: [
+          { id: 3009, name: "Necklace & Earring Sets", slug: "necklace-earring-sets" },
+          { id: 3010, name: "Rings, Bangles & Bracelets", slug: "rings-bangles-bracelets" }
+        ]
+      }
+    ]
   },
   {
-    id: 4,
-    name: "Smart Gadgets & Audio",
-    slug: "smart-gadgets-audio",
-    image_url: "/images/categories/smart-gadgets.webp",
+    id: "CAT-4",
+    name: "Home & Living",
+    slug: "home-living",
+    image_url: "/images/categories/home-living.webp",
     show_on_homepage: true,
     sort_order: 4,
     subcategories: [
       {
         id: 401,
-        name: "Wireless Earbuds (TWS)",
-        slug: "wireless-earbuds-tws",
-        parent_slug: "smart-gadgets-audio",
+        name: "Bedding & Mattresses",
+        slug: "bedding-mattresses",
+        parent_slug: "home-living",
         child_subcategories: [
-          { id: 4001, name: "LED Battery Display TWS", slug: "led-battery-display-tws" },
-          { id: 4002, name: "Bluetooth 5.3 Pro Earbuds", slug: "bluetooth-5-3-earbuds" },
-          { id: 4003, name: "Gaming Low-Latency Pods", slug: "gaming-earbuds" },
-        ],
+          { id: 4001, name: "Waterproof Mattress Protectors", slug: "waterproof-mattress-protectors" },
+          { id: 4002, name: "Fitted Bed Sheets & Sets", slug: "fitted-bed-sheets" },
+          { id: 4003, name: "Pillows & Cushions", slug: "pillows-cushions" }
+        ]
       },
       {
         id: 402,
-        name: "Cables & Fast Chargers",
-        slug: "cables-fast-chargers",
-        parent_slug: "smart-gadgets-audio",
+        name: "Home Decor & Lighting",
+        slug: "home-decor-lighting",
+        parent_slug: "home-living",
         child_subcategories: [
-          { id: 4004, name: "Type-C 3.1A Fast Cables", slug: "type-c-fast-cables" },
-          { id: 4005, name: "Micro USB Android Cables", slug: "micro-usb-cables" },
-          { id: 4006, name: "Quick Charge 3.0 Adapters", slug: "qc-3-adapters" },
-        ],
+          { id: 4004, name: "LED Fairy Lights & Lamps", slug: "led-fairy-lights-lamps" },
+          { id: 4005, name: "Wall Clocks & Wall Art", slug: "wall-clocks-wall-art" },
+          { id: 4006, name: "Artificial Plants & Vases", slug: "artificial-plants-vases" }
+        ]
       },
       {
         id: 403,
-        name: "Wired Handsfree & Audio",
-        slug: "wired-handsfree-audio",
-        parent_slug: "smart-gadgets-audio",
+        name: "Bathroom Accessories",
+        slug: "bathroom-accessories",
+        parent_slug: "home-living",
         child_subcategories: [
-          { id: 4007, name: "Deep Bass Stereo Handsfree", slug: "deep-bass-stereo-handsfree" },
-          { id: 4008, name: "In-Ear Mic Headsets", slug: "in-ear-mic-headsets" },
-        ],
+          { id: 4007, name: "Shower Heads & Dispensers", slug: "shower-heads-dispensers" },
+          { id: 4008, name: "Anti-Slip Floor Mats", slug: "anti-slip-floor-mats" }
+        ]
       },
-    ],
+      {
+        id: 404,
+        name: "Cleaning & Organizers",
+        slug: "cleaning-organizers",
+        parent_slug: "home-living",
+        child_subcategories: [
+          { id: 4009, name: "Mops, Brooms & Dustpans", slug: "mops-brooms-dustpans" },
+          { id: 4010, name: "Wardrobe & Closet Organizers", slug: "wardrobe-closet-organizers" }
+        ]
+      }
+    ]
   },
   {
-    id: 5,
-    name: "Home & Kitchen Essentials",
-    slug: "home-kitchen-essentials",
-    image_url: "/images/categories/home-kitchen.webp",
+    id: "CAT-5",
+    name: "Beauty & Personal Care",
+    slug: "beauty-personal-care",
+    image_url: "/images/categories/beauty-personal-care.webp",
     show_on_homepage: true,
     sort_order: 5,
     subcategories: [
       {
         id: 501,
-        name: "Smart Kitchen Tools",
-        slug: "smart-kitchen-tools",
-        parent_slug: "home-kitchen-essentials",
+        name: "Makeup & Cosmetics",
+        slug: "makeup-cosmetics",
+        parent_slug: "beauty-personal-care",
         child_subcategories: [
-          { id: 5001, name: "4-in-1 Electric Vegetable Slicers", slug: "electric-vegetable-slicers" },
-          { id: 5002, name: "Wireless Garlic Choppers", slug: "wireless-garlic-choppers" },
-          { id: 5003, name: "Rotary Cheese Graters", slug: "rotary-cheese-graters" },
-        ],
+          { id: 5001, name: "Foundations & Concealers", slug: "foundations-concealers" },
+          { id: 5002, name: "Lipsticks & Lip Tints", slug: "lipsticks-lip-tints" },
+          { id: 5003, name: "Eye Shadows & Mascaras", slug: "eye-shadows-mascaras" }
+        ]
       },
       {
         id: 502,
-        name: "Thermal Bottles & Flasks",
-        slug: "thermal-bottles-flasks",
-        parent_slug: "home-kitchen-essentials",
+        name: "Skincare Essentials",
+        slug: "skincare-essentials",
+        parent_slug: "beauty-personal-care",
         child_subcategories: [
-          { id: 5004, name: "LED Temperature Touch Flasks", slug: "led-temperature-flasks" },
-          { id: 5005, name: "Double-Wall Vacuum Bottles", slug: "vacuum-insulated-bottles" },
-        ],
+          { id: 5004, name: "Facial Serums & Essences", slug: "facial-serums-essences" },
+          { id: 5005, name: "Sunblocks & Moisturizers", slug: "sunblocks-moisturizers" },
+          { id: 5006, name: "Face Washes & Scrubs", slug: "face-washes-scrubs" }
+        ]
       },
       {
         id: 503,
-        name: "Home Utility Pumps",
-        slug: "home-utility-pumps",
-        parent_slug: "home-kitchen-essentials",
+        name: "Hair Care & Styling",
+        slug: "hair-care-styling",
+        parent_slug: "beauty-personal-care",
         child_subcategories: [
-          { id: 5006, name: "Automatic Water Dispenser Pumps", slug: "automatic-water-pumps" },
-          { id: 5007, name: "Rechargeable USB Pumps", slug: "rechargeable-usb-pumps" },
-        ],
+          { id: 5007, name: "Hair Dryers & Straighteners", slug: "hair-dryers-straighteners" },
+          { id: 5008, name: "Hair Oils & Masks", slug: "hair-oils-masks" }
+        ]
       },
-    ],
+      {
+        id: 504,
+        name: "Fragrances & Perfumes",
+        slug: "fragrances-perfumes",
+        parent_slug: "beauty-personal-care",
+        child_subcategories: [
+          { id: 5009, name: "Men's Perfumes & Bodysprays", slug: "mens-perfumes-bodysprays" },
+          { id: 5010, name: "Women's Perfumes & Mists", slug: "womens-perfumes-mists" }
+        ]
+      }
+    ]
   },
   {
-    id: 6,
-    name: "Stationery & School Bags",
-    slug: "stationery-school-bags",
-    image_url: "/images/categories/stationery-crafts.webp",
+    id: "CAT-6",
+    name: "Electronics & Mobile",
+    slug: "electronics-mobile",
+    image_url: "/images/categories/electronics-mobile.webp",
     show_on_homepage: true,
     sort_order: 6,
     subcategories: [
       {
         id: 601,
-        name: "School & College Backpacks",
-        slug: "school-college-backpacks",
-        parent_slug: "stationery-school-bags",
+        name: "Audio & Headphones",
+        slug: "audio-headphones",
+        parent_slug: "electronics-mobile",
         child_subcategories: [
-          { id: 6001, name: "Korean Trendy School Bags", slug: "korean-school-bags" },
-          { id: 6002, name: "Slim Waterproof Laptop Bags", slug: "waterproof-laptop-bags" },
-          { id: 6003, name: "Primary School Cartoon Bags", slug: "primary-school-bags" },
-        ],
+          { id: 6001, name: "Wireless TWS Earbuds", slug: "wireless-tws-earbuds" },
+          { id: 6002, name: "Bluetooth Portable Speakers", slug: "bluetooth-portable-speakers" },
+          { id: 6003, name: "Handsfree & Neckbands", slug: "handsfree-neckbands" }
+        ]
       },
       {
         id: 602,
-        name: "DIY Crafts & Foam Sheets",
-        slug: "diy-crafts-foam-sheets",
-        parent_slug: "stationery-school-bags",
+        name: "Mobile Accessories",
+        slug: "mobile-accessories",
+        parent_slug: "electronics-mobile",
         child_subcategories: [
-          { id: 6004, name: "A4 Glitter Foam Sheets (Self Adhesive)", slug: "glitter-foam-sheets" },
-          { id: 6005, name: "Children Craft Accessories", slug: "children-craft-accessories" },
-        ],
+          { id: 6004, name: "Fast Chargers & Adapters", slug: "fast-chargers-adapters" },
+          { id: 6005, name: "Type-C & Lightning Cables", slug: "type-c-lightning-cables" },
+          { id: 6006, name: "Phone Mounts & Ring Lights", slug: "phone-mounts-ring-lights" }
+        ]
       },
-    ],
+      {
+        id: 603,
+        name: "Smart Gadgets",
+        slug: "smart-gadgets",
+        parent_slug: "electronics-mobile",
+        child_subcategories: [
+          { id: 6007, name: "Smart Fitness Watches", slug: "smart-fitness-watches" },
+          { id: 6008, name: "Portable Mini Fans", slug: "portable-mini-fans" }
+        ]
+      },
+      {
+        id: 604,
+        name: "Power & Batteries",
+        slug: "power-batteries",
+        parent_slug: "electronics-mobile",
+        child_subcategories: [
+          { id: 6009, name: "High Capacity Power Banks", slug: "high-capacity-power-banks" },
+          { id: 6010, name: "Multi-Port Extension Sockets", slug: "multi-port-extension-sockets" }
+        ]
+      }
+    ]
   },
+  {
+    id: "CAT-7",
+    name: "Health & Fitness",
+    slug: "health-fitness",
+    image_url: "/images/categories/health-fitness.webp",
+    show_on_homepage: true,
+    sort_order: 7,
+    subcategories: [
+      {
+        id: 701,
+        name: "Exercise & Workout Gear",
+        slug: "exercise-workout-gear",
+        parent_slug: "health-fitness",
+        child_subcategories: [
+          { id: 7001, name: "Yoga Mats & Foam Rollers", slug: "yoga-mats-foam-rollers" },
+          { id: 7002, name: "Resistance Bands & Tubes", slug: "resistance-bands-tubes" },
+          { id: 7003, name: "Hand Grippers & Pushup Bars", slug: "hand-grippers-pushup-bars" }
+        ]
+      },
+      {
+        id: 702,
+        name: "Massagers & Pain Relief",
+        slug: "massagers-pain-relief",
+        parent_slug: "health-fitness",
+        child_subcategories: [
+          { id: 7004, name: "Foot & Neck Massagers", slug: "foot-neck-massagers" },
+          { id: 7005, name: "Posture Correctors & Belts", slug: "posture-correctors-belts" }
+        ]
+      },
+      {
+        id: 703,
+        name: "Health Monitoring",
+        slug: "health-monitoring",
+        parent_slug: "health-fitness",
+        child_subcategories: [
+          { id: 7006, name: "Digital Weight Scales", slug: "digital-weight-scales" },
+          { id: 7007, name: "Infrared Thermometers", slug: "infrared-thermometers" }
+        ]
+      }
+    ]
+  },
+  {
+    id: "CAT-8",
+    name: "Baby & Kids",
+    slug: "baby-kids",
+    image_url: "/images/categories/baby-kids.webp",
+    show_on_homepage: true,
+    sort_order: 8,
+    subcategories: [
+      {
+        id: 801,
+        name: "Baby Feeding & Nursing",
+        slug: "baby-feeding-nursing",
+        parent_slug: "baby-kids",
+        child_subcategories: [
+          { id: 8001, name: "Silicone Feeding Bottles", slug: "silicone-feeding-bottles" },
+          { id: 8002, name: "Sippy Cups & Teethers", slug: "sippy-cups-teethers" }
+        ]
+      },
+      {
+        id: 802,
+        name: "Baby Clothing & Footwear",
+        slug: "baby-clothing-footwear",
+        parent_slug: "baby-kids",
+        child_subcategories: [
+          { id: 8003, name: "Soft Cotton Rompers & Suits", slug: "cotton-rompers-suits" },
+          { id: 8004, name: "Baby Booties & Soft Shoes", slug: "baby-booties-shoes" }
+        ]
+      },
+      {
+        id: 803,
+        name: "Baby Care & Safety",
+        slug: "baby-care-safety",
+        parent_slug: "baby-kids",
+        child_subcategories: [
+          { id: 8005, name: "Baby Grooming Kits", slug: "baby-grooming-kits" },
+          { id: 8006, name: "Mosquito Nets & Bedding", slug: "baby-mosquito-nets" }
+        ]
+      }
+    ]
+  },
+  {
+    id: "CAT-9",
+    name: "Bags & Footwear",
+    slug: "bags-footwear",
+    image_url: "/images/categories/bags-footwear.webp",
+    show_on_homepage: true,
+    sort_order: 9,
+    subcategories: [
+      {
+        id: 901,
+        name: "Women's Bags",
+        slug: "womens-bags",
+        parent_slug: "bags-footwear",
+        child_subcategories: [
+          { id: 9001, name: "Leather Tote Bags", slug: "leather-tote-bags" },
+          { id: 9002, name: "Crossbody & Shoulder Bags", slug: "crossbody-shoulder-bags" },
+          { id: 9003, name: "Party Clutches & Wallets", slug: "party-clutches-wallets" }
+        ]
+      },
+      {
+        id: 902,
+        name: "Men's Wallets & Accessories",
+        slug: "mens-wallets-accessories",
+        parent_slug: "bags-footwear",
+        child_subcategories: [
+          { id: 9004, name: "Genuine Leather Wallets", slug: "genuine-leather-wallets" },
+          { id: 9005, name: "Card Holders & Key Pouches", slug: "card-holders-key-pouches" }
+        ]
+      },
+      {
+        id: 903,
+        name: "Backpacks & Travel Bags",
+        slug: "backpacks-travel-bags",
+        parent_slug: "bags-footwear",
+        child_subcategories: [
+          { id: 9006, name: "Laptop Backpacks", slug: "laptop-backpacks" },
+          { id: 9007, name: "Duffel & Gym Bags", slug: "duffel-gym-bags" }
+        ]
+      },
+      {
+        id: 904,
+        name: "Footwear",
+        slug: "footwear",
+        parent_slug: "bags-footwear",
+        child_subcategories: [
+          { id: 9008, name: "Comfort Slides & Slippers", slug: "comfort-slides-slippers" },
+          { id: 9009, name: "Casual Sneakers & Loafers", slug: "casual-sneakers-loafers" }
+        ]
+      }
+    ]
+  },
+  {
+    id: "CAT-10",
+    name: "Tools & Auto",
+    slug: "tools-auto",
+    image_url: "/images/categories/tools-auto.webp",
+    show_on_homepage: true,
+    sort_order: 10,
+    subcategories: [
+      {
+        id: 1001,
+        name: "Car Interior Accessories",
+        slug: "car-interior-accessories",
+        parent_slug: "tools-auto",
+        child_subcategories: [
+          { id: 10001, name: "Car Phone Mounts & Chargers", slug: "car-phone-mounts-chargers" },
+          { id: 10002, name: "Portable Car Vacuum Cleaners", slug: "car-vacuum-cleaners" },
+          { id: 10003, name: "Ambient Car LED Lights", slug: "ambient-car-led-lights" }
+        ]
+      },
+      {
+        id: 1002,
+        name: "Hand Tools & Kits",
+        slug: "hand-tools-kits",
+        parent_slug: "tools-auto",
+        child_subcategories: [
+          { id: 10004, name: "Multi-Bit Screwdriver Sets", slug: "screwdriver-sets" },
+          { id: 10005, name: "Pliers, Wrenches & Hammers", slug: "pliers-wrenches-hammers" },
+          { id: 10006, name: "Measuring Tapes & Levels", slug: "measuring-tapes-levels" }
+        ]
+      },
+      {
+        id: 1003,
+        name: "Power Tools & Hardware",
+        slug: "power-tools-hardware",
+        parent_slug: "tools-auto",
+        child_subcategories: [
+          { id: 10007, name: "Cordless Drills & Drivers", slug: "cordless-drills-drivers" },
+          { id: 10008, name: "Hot Glue Guns & Soldering", slug: "glue-guns-soldering" }
+        ]
+      },
+      {
+        id: 1004,
+        name: "Auto Care & Cleaning",
+        slug: "auto-care-cleaning",
+        parent_slug: "tools-auto",
+        child_subcategories: [
+          { id: 10009, name: "Microfiber Detailing Towels", slug: "microfiber-detailing-towels" },
+          { id: 10010, name: "Tyre Inflators & Gauges", slug: "tyre-inflators-gauges" }
+        ]
+      }
+    ]
+  },
+  {
+    id: "CAT-11",
+    name: "Stationery & Gifts",
+    slug: "stationery-gifts",
+    image_url: "/images/categories/stationery-gifts.webp",
+    show_on_homepage: true,
+    sort_order: 11,
+    subcategories: [
+      {
+        id: 1101,
+        name: "Art & Craft Supplies",
+        slug: "art-craft-supplies",
+        parent_slug: "stationery-gifts",
+        child_subcategories: [
+          { id: 11001, name: "Glitter Foam Sheets & Papers", slug: "glitter-foam-sheets" },
+          { id: 11002, name: "Color Marker & Brush Sets", slug: "color-marker-brush-sets" },
+          { id: 11003, name: "Acrylic Paints & Palettes", slug: "acrylic-paints-palettes" }
+        ]
+      },
+      {
+        id: 1102,
+        name: "Office & School Stationery",
+        slug: "office-school-stationery",
+        parent_slug: "stationery-gifts",
+        child_subcategories: [
+          { id: 11004, name: "Diaries & Planner Notebooks", slug: "diaries-planner-notebooks" },
+          { id: 11005, name: "Gel Pens & Highlighters", slug: "gel-pens-highlighters" },
+          { id: 11006, name: "Calculators & Math Sets", slug: "calculators-math-sets" }
+        ]
+      },
+      {
+        id: 1103,
+        name: "Gifts & Novelties",
+        slug: "gifts-novelties",
+        parent_slug: "stationery-gifts",
+        child_subcategories: [
+          { id: 11007, name: "Gift Wrapping & Boxes", slug: "gift-wrapping-boxes" },
+          { id: 11008, name: "Cute Keychains & Badges", slug: "cute-keychains-badges" }
+        ]
+      }
+    ]
+  },
+  {
+    id: "CAT-12",
+    name: "Pets & Garden",
+    slug: "pets-garden",
+    image_url: "/images/categories/pets-garden.webp",
+    show_on_homepage: true,
+    sort_order: 12,
+    subcategories: [
+      {
+        id: 1201,
+        name: "Pet Feeding & Accessories",
+        slug: "pet-feeding-accessories",
+        parent_slug: "pets-garden",
+        child_subcategories: [
+          { id: 12001, name: "Stainless Steel Pet Bowls", slug: "pet-bowls-feeders" },
+          { id: 12002, name: "Collars, Harnesses & Leashes", slug: "pet-collars-leashes" },
+          { id: 12003, name: "Interactive Pet Toys", slug: "interactive-pet-toys" }
+        ]
+      },
+      {
+        id: 1202,
+        name: "Pet Grooming & Care",
+        slug: "pet-grooming-care",
+        parent_slug: "pets-garden",
+        child_subcategories: [
+          { id: 12004, name: "Pet Hair Brushes & Combs", slug: "pet-hair-brushes" },
+          { id: 12005, name: "Pet Nail Clippers & Shampoos", slug: "pet-nail-clippers" }
+        ]
+      },
+      {
+        id: 1203,
+        name: "Gardening Tools & Decor",
+        slug: "gardening-tools-decor",
+        parent_slug: "pets-garden",
+        child_subcategories: [
+          { id: 12006, name: "Watering Cans & Sprayers", slug: "watering-cans-sprayers" },
+          { id: 12007, name: "Pruning Shears & Trowels", slug: "pruning-shears-trowels" },
+          { id: 12008, name: "Indoor Planters & Pots", slug: "indoor-planters-pots" }
+        ]
+      }
+    ]
+  }
 ];
 
 // ==========================================
