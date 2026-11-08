@@ -86,6 +86,8 @@ import {
   hhcCheckConnection,
   hhcGetCouriers,
   hhcGetSuppliers,
+  getCachedHhcSuppliers,
+  hhcSyncAllLiveSuppliers,
   hhcGetProductsBySupplier,
   hhcForwardOrderToCourier,
   hhcSyncAllCatalog,
@@ -209,15 +211,16 @@ export default function AdminPage() {
 
   // HHC Dropshipping Pakistan Engine State
   const [hhcConnected, setHhcConnected] = useState<boolean | null>(true);
-  const [hhcSuppliers, setHhcSuppliers] = useState<HHCSupplier[]>(HHC_VERIFIED_SUPPLIERS);
-  const [selectedHhcSupplier, setSelectedHhcSupplier] = useState<HHCSupplier | null>(HHC_VERIFIED_SUPPLIERS[0]);
+  const [hhcSuppliers, setHhcSuppliers] = useState<HHCSupplier[]>(getCachedHhcSuppliers());
+  const [selectedHhcSupplier, setSelectedHhcSupplier] = useState<HHCSupplier | null>(getCachedHhcSuppliers()[0]);
   const [hhcSupplierProducts, setHhcSupplierProducts] = useState<HHCCatalogItem[]>(HHC_CATALOG_PRODUCTS);
   const [hhcImportLoading, setHhcImportLoading] = useState(false);
+  const [hhcSuppliersSyncing, setHhcSuppliersSyncing] = useState(false);
   const [hhcSearchQuery, setHhcSearchQuery] = useState("");
   const [hhcCityFilter, setHhcCityFilter] = useState("all");
   const [hhcCategoryFilter, setHhcCategoryFilter] = useState("all");
   const [hhcSupplierPage, setHhcSupplierPage] = useState(1);
-  const hhcSupplierPageSize = 8;
+  const hhcSupplierPageSize = 16;
   const [selectedHhcProductIds, setSelectedHhcProductIds] = useState<number[]>([]);
   const [hhcMarginType, setHhcMarginType] = useState<"fixed" | "percentage">("fixed");
   const [hhcMarginValue, setHhcMarginValue] = useState<number>(500);
@@ -382,7 +385,7 @@ export default function AdminPage() {
         setHhcConnected(res.success);
       });
 
-      // 2. Load suppliers
+      // 2. Load suppliers (Cached or live)
       hhcGetSuppliers(1).then((res) => {
         if (res.data && res.data.length > 0) {
           setHhcSuppliers(res.data);
@@ -391,6 +394,14 @@ export default function AdminPage() {
           }
         }
       });
+
+      const onSuppliersUpdated = (e: Event) => {
+        const custom = e as CustomEvent<HHCSupplier[]>;
+        if (Array.isArray(custom.detail) && custom.detail.length > 0) {
+          setHhcSuppliers(custom.detail);
+        }
+      };
+      window.addEventListener("hhc_suppliers_updated", onSuppliersUpdated);
 
       // 3. Load RCP orders
       hhcGetRcpOrders().then((items) => {
@@ -403,8 +414,33 @@ export default function AdminPage() {
       setHhcMarginValue(savedSettings.marginValue || 500);
       setHhcSelectedCourierId(savedSettings.defaultCourierId || 2);
       setHhcAppKey(savedSettings.apiKey || "y4whA0TGxXRBlcHiEm9pd0WEGQKJp06R");
+
+      return () => {
+        window.removeEventListener("hhc_suppliers_updated", onSuppliersUpdated);
+      };
     }
   }, [isAuthenticated, activeTab]);
+
+  // 1-Click Real-time Supplier Sync from HHC Dropshipping Open API
+  const handleSyncHhcSuppliers = async () => {
+    setHhcSuppliersSyncing(true);
+    showToast("⏳ Fetching live wholesale supplier hubs from HHC Dropshipping API...");
+    try {
+      const res = await hhcSyncAllLiveSuppliers();
+      if (res.success) {
+        setHhcSuppliers(res.data);
+        showToast(`✅ Successfully synced ${res.total} live wholesale hubs from HHC!`);
+      } else {
+        setHhcSuppliers(res.data);
+        showToast(`⚠️ Sync notice: Showing ${res.total} verified suppliers.`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Sync failed";
+      showToast(`❌ Sync error: ${msg}`);
+    } finally {
+      setHhcSuppliersSyncing(false);
+    }
+  };
 
   // Load products when selected supplier changes
   const handleSelectSupplier = async (supp: HHCSupplier) => {
@@ -2756,7 +2792,7 @@ export default function AdminPage() {
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Wholesale Suppliers</span>
                 <p className="text-sm font-black text-blue-700 mt-1">{hhcSuppliers.length} Verified Hubs</p>
-                <p className="text-xs text-slate-500 mt-0.5">Karachi, Lahore & Faisalabad</p>
+                <p className="text-xs text-slate-500 mt-0.5">Karachi, Lahore, Rawalpindi & Nationwide</p>
               </div>
 
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
@@ -2905,36 +2941,55 @@ export default function AdminPage() {
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
-                      <Download className="w-5 h-5 text-blue-600" />
-                      <span>HHC Live Supplier Catalog Browser</span>
-                    </h2>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                        <Download className="w-5 h-5 text-blue-600" />
+                        <span>HHC Live Supplier Catalog Browser</span>
+                      </h2>
+                      <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-extrabold">
+                        {hhcSuppliers.length} Verified Hubs
+                      </span>
+                    </div>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Browse verified supplier hubs across Pakistan and bulk import products into Abrish Mart with 1 click.
+                      Browse all wholesale supplier hubs across Pakistan and bulk import live products into Abrish Mart with 1 click.
                     </p>
                   </div>
 
-                  {/* Profit Margin Rules on Import */}
-                  <div className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                    <span className="text-[11px] font-bold text-slate-700">Profit Margin:</span>
-                    <select
-                      value={hhcMarginType}
-                      onChange={(e) => setHhcMarginType(e.target.value as "fixed" | "percentage")}
-                      className="text-xs font-bold bg-white border border-slate-200 rounded-lg px-2 py-1"
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {/* Live Sync Suppliers Button */}
+                    <button
+                      type="button"
+                      disabled={hhcSuppliersSyncing}
+                      onClick={handleSyncHhcSuppliers}
+                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl border border-blue-200 shadow-2xs flex items-center gap-1.5 transition cursor-pointer"
+                      title="Fetch newly added suppliers and live stock directly from HHC Dropshipping Open API"
                     >
-                      <option value="fixed">Fixed (+PKR)</option>
-                      <option value="percentage">Percentage (+%)</option>
-                    </select>
-                    <input
-                      type="number"
-                      value={hhcMarginValue}
-                      onChange={(e) => setHhcMarginValue(parseFloat(e.target.value) || 0)}
-                      className="w-20 text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg px-2 py-1"
-                      placeholder="500"
-                    />
-                    <span className="text-[10px] text-slate-400">
-                      {hhcMarginType === "fixed" ? "+Rs. " + hhcMarginValue : "+" + hhcMarginValue + "%"}
-                    </span>
+                      <RefreshCw className={`w-3.5 h-3.5 ${hhcSuppliersSyncing ? "animate-spin text-blue-600" : ""}`} />
+                      <span>{hhcSuppliersSyncing ? "Syncing HHC Hubs..." : "Sync Live HHC Hubs"}</span>
+                    </button>
+
+                    {/* Profit Margin Rules on Import */}
+                    <div className="flex items-center gap-2 bg-slate-50 p-1.5 px-2.5 rounded-xl border border-slate-200">
+                      <span className="text-[11px] font-bold text-slate-700">Margin:</span>
+                      <select
+                        value={hhcMarginType}
+                        onChange={(e) => setHhcMarginType(e.target.value as "fixed" | "percentage")}
+                        className="text-xs font-bold bg-white border border-slate-200 rounded-lg px-2 py-1"
+                      >
+                        <option value="fixed">Fixed (+PKR)</option>
+                        <option value="percentage">Percentage (+%)</option>
+                      </select>
+                      <input
+                        type="number"
+                        value={hhcMarginValue}
+                        onChange={(e) => setHhcMarginValue(parseFloat(e.target.value) || 0)}
+                        className="w-16 text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg px-2 py-1"
+                        placeholder="500"
+                      />
+                      <span className="text-[10px] text-slate-400">
+                        {hhcMarginType === "fixed" ? "+Rs. " + hhcMarginValue : "+" + hhcMarginValue + "%"}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -2955,7 +3010,7 @@ export default function AdminPage() {
                     />
                   </div>
 
-                  {/* 2. City Filter */}
+                  {/* 2. Dynamic City Filter */}
                   <div>
                     <select
                       value={hhcCityFilter}
@@ -2966,19 +3021,21 @@ export default function AdminPage() {
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-pink"
                     >
                       <option value="all">🏙️ All Supplier Cities ({hhcSuppliers.length})</option>
-                      <option value="Karachi">Karachi Hubs</option>
-                      <option value="Lahore">Lahore Hubs</option>
-                      <option value="Faisalabad">Faisalabad Hubs</option>
-                      <option value="Rawalpindi">Rawalpindi / Islamabad</option>
-                      <option value="Peshawar">Peshawar Hubs</option>
-                      <option value="Multan">Multan Hubs</option>
-                      <option value="Sialkot">Sialkot Hubs</option>
-                      <option value="Gujranwala">Gujranwala Hubs</option>
-                      <option value="Kot Addu">Kot Addu Hubs</option>
+                      {Array.from(new Set(hhcSuppliers.map((s) => s.cityName)))
+                        .filter(Boolean)
+                        .sort()
+                        .map((city) => {
+                          const count = hhcSuppliers.filter((s) => s.cityName === city).length;
+                          return (
+                            <option key={city} value={city}>
+                              {city} Hubs ({count})
+                            </option>
+                          );
+                        })}
                     </select>
                   </div>
 
-                  {/* 3. Category Filter */}
+                  {/* 3. Category Filter with Counts */}
                   <div>
                     <select
                       value={hhcCategoryFilter}
@@ -2989,18 +3046,29 @@ export default function AdminPage() {
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-pink"
                     >
                       <option value="all">📁 All Supplier Categories</option>
-                      <option value="Kitchen">Kitchen</option>
-                      <option value="Toys">Toys</option>
-                      <option value="Fashion">Fashion</option>
-                      <option value="Home & Living">Home & Living</option>
-                      <option value="Beauty & Personal Care">Beauty & Personal Care</option>
-                      <option value="Electronics & Mobile">Electronics & Mobile</option>
-                      <option value="Health & Fitness">Health & Fitness</option>
-                      <option value="Baby & Kids">Baby & Kids</option>
-                      <option value="Bags & Footwear">Bags & Footwear</option>
-                      <option value="Tools & Auto">Tools & Auto</option>
-                      <option value="Stationery & Gifts">Stationery & Gifts</option>
-                      <option value="Pets & Garden">Pets & Garden</option>
+                      {[
+                        "Kitchen",
+                        "Toys",
+                        "Fashion",
+                        "Home & Living",
+                        "Beauty & Personal Care",
+                        "Electronics & Mobile",
+                        "Health & Fitness",
+                        "Baby & Kids",
+                        "Bags & Footwear",
+                        "Tools & Auto",
+                        "Stationery & Gifts",
+                        "Pets & Garden",
+                      ].map((cat) => {
+                        const count = hhcSuppliers.filter(
+                          (s) => s.category?.toLowerCase() === cat.toLowerCase()
+                        ).length;
+                        return (
+                          <option key={cat} value={cat}>
+                            {cat} {count > 0 ? `(${count})` : ""}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </div>
@@ -3052,47 +3120,108 @@ export default function AdminPage() {
                     })}
                   </div>
 
-                  {/* SUPPLIERS PAGINATION BAR ([1] [2] [3] [4] ... Next) */}
-                  {totalSupplierPages > 1 && (
-                    <div className="flex items-center justify-center gap-1.5 pt-2 border-t border-slate-100">
-                      <button
-                        type="button"
-                        disabled={currentPage <= 1}
-                        onClick={() => setHhcSupplierPage((p) => Math.max(1, p - 1))}
-                        className="px-3 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
-                      >
-                        Prev
-                      </button>
+                  {/* SMART SUPPLIERS PAGINATION BAR */}
+                  {totalSupplierPages > 1 && (() => {
+                    const pagesToShow: number[] = [];
+                    const maxButtons = 5;
+                    let startPage = Math.max(1, currentPage - 2);
+                    let endPage = Math.min(totalSupplierPages, startPage + maxButtons - 1);
+                    if (endPage - startPage + 1 < maxButtons) {
+                      startPage = Math.max(1, endPage - maxButtons + 1);
+                    }
+                    for (let i = startPage; i <= endPage; i++) pagesToShow.push(i);
 
-                      {Array.from({ length: totalSupplierPages }).map((_, i) => {
-                        const pageNum = i + 1;
-                        const isActive = pageNum === currentPage;
-                        return (
+                    return (
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs">
+                        <span className="text-slate-500 text-[11px] font-medium">
+                          Showing {(currentPage - 1) * hhcSupplierPageSize + 1} to{" "}
+                          {Math.min(currentPage * hhcSupplierPageSize, filteredSuppliers.length)} of {filteredSuppliers.length} supplier hubs
+                        </span>
+
+                        <div className="flex items-center gap-1.5">
                           <button
-                            key={pageNum}
                             type="button"
-                            onClick={() => setHhcSupplierPage(pageNum)}
-                            className={`w-7 h-7 rounded-lg text-xs font-extrabold transition ${
-                              isActive
-                                ? "bg-brand-pink text-white shadow-xs"
-                                : "border border-slate-200 text-slate-700 hover:bg-slate-100"
-                            }`}
+                            disabled={currentPage <= 1}
+                            onClick={() => setHhcSupplierPage(1)}
+                            className="px-2 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50"
+                            title="First Page"
                           >
-                            {pageNum}
+                            &laquo;
                           </button>
-                        );
-                      })}
+                          <button
+                            type="button"
+                            disabled={currentPage <= 1}
+                            onClick={() => setHhcSupplierPage((p) => Math.max(1, p - 1))}
+                            className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50"
+                          >
+                            Prev
+                          </button>
 
-                      <button
-                        type="button"
-                        disabled={currentPage >= totalSupplierPages}
-                        onClick={() => setHhcSupplierPage((p) => Math.min(totalSupplierPages, p + 1))}
-                        className="px-3 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  )}
+                          {startPage > 1 && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setHhcSupplierPage(1)}
+                                className="w-7 h-7 rounded-lg text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-100"
+                              >
+                                1
+                              </button>
+                              {startPage > 2 && <span className="text-slate-300 px-0.5">&hellip;</span>}
+                            </>
+                          )}
+
+                          {pagesToShow.map((pageNum) => {
+                            const isActive = pageNum === currentPage;
+                            return (
+                              <button
+                                key={pageNum}
+                                type="button"
+                                onClick={() => setHhcSupplierPage(pageNum)}
+                                className={`w-7 h-7 rounded-lg text-xs font-extrabold transition cursor-pointer ${
+                                  isActive
+                                    ? "bg-brand-pink text-white shadow-xs"
+                                    : "border border-slate-200 text-slate-700 hover:bg-slate-100"
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          })}
+
+                          {endPage < totalSupplierPages && (
+                            <>
+                              {endPage < totalSupplierPages - 1 && <span className="text-slate-300 px-0.5">&hellip;</span>}
+                              <button
+                                type="button"
+                                onClick={() => setHhcSupplierPage(totalSupplierPages)}
+                                className="w-7 h-7 rounded-lg text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-100"
+                              >
+                                {totalSupplierPages}
+                              </button>
+                            </>
+                          )}
+
+                          <button
+                            type="button"
+                            disabled={currentPage >= totalSupplierPages}
+                            onClick={() => setHhcSupplierPage((p) => Math.min(totalSupplierPages, p + 1))}
+                            className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50"
+                          >
+                            Next
+                          </button>
+                          <button
+                            type="button"
+                            disabled={currentPage >= totalSupplierPages}
+                            onClick={() => setHhcSupplierPage(totalSupplierPages)}
+                            className="px-2 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50"
+                            title="Last Page"
+                          >
+                            &raquo;
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 

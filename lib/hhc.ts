@@ -130,15 +130,27 @@ export async function hhcGetCouriers() {
 }
 
 // --------------------------------------------------------------
-// 2. SUPPLIERS CATALOG
+// 2. SUPPLIERS CATALOG (367+ LIVE WHOLESALE HUBS ACROSS PAKISTAN)
 // --------------------------------------------------------------
+export function getCachedHhcSuppliers(): HHCSupplier[] {
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem("hhc_all_suppliers_cache");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+  }
+  return HHC_VERIFIED_SUPPLIERS;
+}
+
 export async function hhcGetSuppliers(page: number = 1, search: string = ""): Promise<{
   success: boolean;
   data: HHCSupplier[];
 }> {
   const supplierMap = new Map<string | number, HHCSupplier>();
-  // Populate all verified supplier hubs so the list never randomly shrinks
-  HHC_VERIFIED_SUPPLIERS.forEach((s) => supplierMap.set(s.storeID || s.storeName, { ...s }));
+  getCachedHhcSuppliers().forEach((s) => supplierMap.set(s.storeID || s.storeName, { ...s }));
 
   try {
     const controller = new AbortController();
@@ -164,7 +176,8 @@ export async function hhcGetSuppliers(page: number = 1, search: string = ""): Pr
             storeName: storeName || existing?.storeName || "HHC Supplier",
             cityName: String(item.cityName || item.city_name || item.city || existing?.cityName || "Karachi"),
             hubName: String(item.hubName || item.hub_name || existing?.hubName || "Central Hub"),
-            productsCount: Number(item.productsCount || item.products_count || item.total_products || existing?.productsCount || 0),
+            productsCount: Number(item.productsCount || item.products_count || (item.products ? item.products.length : 0) || existing?.productsCount || 0),
+            category: existing?.category || "Home & Living",
           });
         });
       }
@@ -182,6 +195,96 @@ export async function hhcGetSuppliers(page: number = 1, search: string = ""): Pr
   }
 
   return { success: true, data: result };
+}
+
+// Real-Time Full Sync from HHC Dropshipping API (Fetches all pages and any newly registered suppliers)
+export async function hhcSyncAllLiveSuppliers(): Promise<{
+  success: boolean;
+  total: number;
+  data: HHCSupplier[];
+  error?: string;
+}> {
+  const supplierMap = new Map<number, HHCSupplier>();
+  getCachedHhcSuppliers().forEach((s) => supplierMap.set(s.storeID, { ...s }));
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    const p1Res = await fetch(`${HHC_BASE_URL}/store_wise_products?page=1`, {
+      method: "GET",
+      headers: getHeaders(),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!p1Res.ok) throw new Error(`HHC API returned status ${p1Res.status}`);
+    const p1Json = await p1Res.json();
+    const lastPage = Math.min(Number(p1Json.last_page) || 25, 40);
+    const p1Data = Array.isArray(p1Json.data) ? p1Json.data : [];
+
+    const processItem = (item: any) => {
+      const storeID = Number(item.storeID || item.id || item.store_id || 0);
+      if (!storeID) return;
+      const storeName = String(item.storeName || item.store_name || item.name || `Supplier #${storeID}`).trim();
+      const cityName = String(item.cityName || item.city_name || item.city || "Karachi").trim();
+      const hubName = String(item.hubName || item.hub_name || `${cityName} Hub`).trim();
+      const productsCount = Number(item.productsCount || item.products_count || (item.products ? item.products.length : 0) || 0);
+      const existing = supplierMap.get(storeID);
+      supplierMap.set(storeID, {
+        storeID,
+        storeName,
+        cityName,
+        hubName,
+        productsCount: productsCount || existing?.productsCount || 0,
+        category: existing?.category || "Home & Living",
+      });
+    };
+
+    p1Data.forEach(processItem);
+
+    // Fetch remaining pages in concurrent batches of 6
+    const remainingPages = Array.from({ length: lastPage - 1 }, (_, i) => i + 2);
+    for (let i = 0; i < remainingPages.length; i += 6) {
+      const batch = remainingPages.slice(i, i + 6);
+      await Promise.all(
+        batch.map(async (pageNo) => {
+          try {
+            const ctrl = new AbortController();
+            const tm = setTimeout(() => ctrl.abort(), 9000);
+            const r = await fetch(`${HHC_BASE_URL}/store_wise_products?page=${pageNo}`, {
+              method: "GET",
+              headers: getHeaders(),
+              signal: ctrl.signal,
+            });
+            clearTimeout(tm);
+            if (r.ok) {
+              const j = await r.json();
+              if (Array.isArray(j.data)) {
+                j.data.forEach(processItem);
+              }
+            }
+          } catch {}
+        })
+      );
+    }
+
+    const allSuppliers = Array.from(supplierMap.values()).sort(
+      (a, b) => b.productsCount - a.productsCount || a.storeName.localeCompare(b.storeName)
+    );
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("hhc_all_suppliers_cache", JSON.stringify(allSuppliers));
+        window.dispatchEvent(new CustomEvent("hhc_suppliers_updated", { detail: allSuppliers }));
+      } catch {}
+    }
+
+    return { success: true, total: allSuppliers.length, data: allSuppliers };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Sync failed";
+    const fallbackList = Array.from(supplierMap.values());
+    return { success: false, total: fallbackList.length, data: fallbackList, error: msg };
+  }
 }
 
 // --------------------------------------------------------------
