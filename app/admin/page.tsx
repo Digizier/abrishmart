@@ -178,6 +178,8 @@ export default function AdminPage() {
   const [productSearchQuery, setProductSearchQuery] = useState("");
   const [productCategoryFilter, setProductCategoryFilter] = useState("all");
   const [productStatusFilter, setProductStatusFilter] = useState("all");
+  const [productPage, setProductPage] = useState(1);
+  const productPageSize = 20;
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
   const [bulkDeleteTargetIds, setBulkDeleteTargetIds] = useState<string[]>([]);
@@ -222,6 +224,20 @@ export default function AdminPage() {
   const [hhcSupplierPage, setHhcSupplierPage] = useState(1);
   const hhcSupplierPageSize = 16;
   const [selectedHhcProductIds, setSelectedHhcProductIds] = useState<number[]>([]);
+  const [hhcProductPage, setHhcProductPage] = useState(1);
+  const [hhcProductTotal, setHhcProductTotal] = useState(0);
+  const [hhcProductLastPage, setHhcProductLastPage] = useState(1);
+
+  // Batch Import Category Review Modal
+  const [batchImportModalOpen, setBatchImportModalOpen] = useState(false);
+  const [batchImportTargetCategory, setBatchImportTargetCategory] = useState("auto");
+  const [batchImportProducts, setBatchImportProducts] = useState<HHCCatalogItem[]>([]);
+  const [batchImportSelectedIds, setBatchImportSelectedIds] = useState<number[]>([]);
+  const [batchImporting, setBatchImporting] = useState(false);
+
+  // HHC Stock & Price Sync Pagination
+  const [syncPage, setSyncPage] = useState(1);
+  const syncPageSize = 20;
   const [hhcMarginType, setHhcMarginType] = useState<"fixed" | "percentage">("fixed");
   const [hhcMarginValue, setHhcMarginValue] = useState<number>(500);
   const [hhcSelectedCourierId, setHhcSelectedCourierId] = useState<number>(2);
@@ -443,16 +459,100 @@ export default function AdminPage() {
   };
 
   // Load products when selected supplier changes
-  const handleSelectSupplier = async (supp: HHCSupplier) => {
+  const handleSelectSupplier = async (supp: HHCSupplier, page: number = 1) => {
     setSelectedHhcSupplier(supp);
+    setHhcProductPage(page);
     setHhcImportLoading(true);
     try {
-      const res = await hhcGetProductsBySupplier(supp.storeID, 1);
-      if (res.data) setHhcSupplierProducts(res.data);
+      const res = await hhcGetProductsBySupplier(supp.storeID, page);
+      if (res.data) {
+        setHhcSupplierProducts(res.data);
+        const total = res.total || supp.productsCount || 0;
+        setHhcProductTotal(total);
+        setHhcProductLastPage(res.lastPage || Math.max(1, Math.ceil(total / 15)));
+      }
     } catch (err: unknown) {
       console.warn("Error loading supplier products:", err);
     } finally {
       setHhcImportLoading(false);
+    }
+  };
+
+  // Open Category Selection & Batch Import Modal
+  const openBatchImportModal = (items: HHCCatalogItem[]) => {
+    if (items.length === 0) {
+      showToast("Please select at least 1 product to import.");
+      return;
+    }
+    setBatchImportProducts(items);
+    setBatchImportSelectedIds(items.map((i) => i.id));
+    setBatchImportTargetCategory("auto");
+    setBatchImportModalOpen(true);
+  };
+
+  // Confirm Batch Import with Category
+  const handleConfirmBatchImport = async () => {
+    const itemsToImport = batchImportProducts.filter((p) => batchImportSelectedIds.includes(p.id));
+    if (itemsToImport.length === 0) {
+      showToast("No products checked to import.");
+      return;
+    }
+    setBatchImporting(true);
+    showToast(`⏳ Importing ${itemsToImport.length} products into store catalogue...`);
+    let imported = 0;
+    try {
+      for (const item of itemsToImport) {
+        const pricing = calculateHhcSellingPrice(item.wholesalePrice, hhcMarginType, hhcMarginValue);
+        let targetCatSlug = "";
+        if (batchImportTargetCategory !== "auto") {
+          targetCatSlug = batchImportTargetCategory;
+        } else {
+          const matched = categories.find(
+            (c) =>
+              c.name.toLowerCase().includes(item.category.toLowerCase()) ||
+              c.slug.toLowerCase().includes(item.category.toLowerCase())
+          );
+          targetCatSlug = matched?.slug || categories[0]?.slug || "home-living";
+        }
+
+        const newProduct: Partial<Product> = {
+          title: item.name,
+          slug:
+            item.name
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-+|-+$/g, "") +
+            "-" +
+            Math.floor(100 + Math.random() * 900),
+          description: item.description || "High quality product sourced from HHC Dropshipping Pakistan.",
+          price: pricing.salePrice,
+          original_price: Math.round(pricing.salePrice * 1.35),
+          wholesale_price: item.wholesalePrice,
+          stock: item.stock || 40,
+          thumbnail_url: item.thumbnail,
+          gallery_urls: item.gallery && item.gallery.length > 0 ? item.gallery : [item.thumbnail],
+          category_slug: targetCatSlug,
+          is_active: true,
+          is_featured: true,
+          is_flash_deal: false,
+          sku: item.sku || `HHC-${item.id}`,
+          rating: 4.8,
+          reviews_count: Math.floor(15 + Math.random() * 45),
+        };
+
+        const res = await adminSaveProduct(newProduct);
+        if (res.success) imported++;
+      }
+
+      showToast(`🎉 Successfully imported ${imported} products into store catalog!`);
+      setBatchImportModalOpen(false);
+      setSelectedHhcProductIds([]);
+      loadData(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Batch import failed";
+      showToast(`❌ Import error: ${msg}`);
+    } finally {
+      setBatchImporting(false);
     }
   };
 
@@ -1514,9 +1614,17 @@ export default function AdminPage() {
             return matchesSearch && matchesCategory && matchesStatus;
           });
 
+          // 20 Products Per Page Pagination
+          const totalProductPages = Math.max(1, Math.ceil(filteredProducts.length / productPageSize));
+          const currentProductPage = Math.min(productPage, totalProductPages);
+          const pagedProducts = filteredProducts.slice(
+            (currentProductPage - 1) * productPageSize,
+            currentProductPage * productPageSize
+          );
+
           const isAllSelected =
-            filteredProducts.length > 0 &&
-            filteredProducts.every((p) => selectedProductIds.includes(String(p.id)));
+            pagedProducts.length > 0 &&
+            pagedProducts.every((p) => selectedProductIds.includes(String(p.id)));
 
           return (
             <div className="space-y-6">
@@ -1525,7 +1633,8 @@ export default function AdminPage() {
                 <div>
                   <h2 className="text-lg font-black text-slate-900">Products & Inventory Manager</h2>
                   <p className="text-xs text-slate-500">
-                    Showing {filteredProducts.length} of {products.length} catalog products with direct database synchronization.
+                    Showing {(currentProductPage - 1) * productPageSize + 1} to{" "}
+                    {Math.min(currentProductPage * productPageSize, filteredProducts.length)} of {filteredProducts.length} catalog products (Page {currentProductPage} of {totalProductPages}) with direct database synchronization.
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1594,15 +1703,21 @@ export default function AdminPage() {
                   <input
                     type="text"
                     value={productSearchQuery}
-                    onChange={(e) => setProductSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setProductSearchQuery(e.target.value);
+                      setProductPage(1);
+                    }}
                     placeholder="Search by Title, SKU, or Keyword..."
                     className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-pink"
                   />
                   {productSearchQuery && (
                     <button
                       type="button"
-                      onClick={() => setProductSearchQuery("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                      onClick={() => {
+                        setProductSearchQuery("");
+                        setProductPage(1);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
                     >
                       ✕
                     </button>
@@ -1613,7 +1728,10 @@ export default function AdminPage() {
                 <div>
                   <select
                     value={productCategoryFilter}
-                    onChange={(e) => setProductCategoryFilter(e.target.value)}
+                    onChange={(e) => {
+                      setProductCategoryFilter(e.target.value);
+                      setProductPage(1);
+                    }}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-pink"
                   >
                     <option value="all">📁 All Categories ({products.length})</option>
@@ -1631,7 +1749,10 @@ export default function AdminPage() {
                 <div>
                   <select
                     value={productStatusFilter}
-                    onChange={(e) => setProductStatusFilter(e.target.value)}
+                    onChange={(e) => {
+                      setProductStatusFilter(e.target.value);
+                      setProductPage(1);
+                    }}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-pink"
                   >
                     <option value="all">⚡ All Status & Badges</option>
@@ -1691,13 +1812,15 @@ export default function AdminPage() {
                             checked={isAllSelected}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedProductIds(filteredProducts.map((p) => String(p.id)));
+                                const pageIds = pagedProducts.map((p) => String(p.id));
+                                setSelectedProductIds((prev) => Array.from(new Set([...prev, ...pageIds])));
                               } else {
-                                setSelectedProductIds([]);
+                                const pageIds = new Set(pagedProducts.map((p) => String(p.id)));
+                                setSelectedProductIds((prev) => prev.filter((id) => !pageIds.has(id)));
                               }
                             }}
                             className="rounded text-brand-pink focus:ring-brand-pink cursor-pointer"
-                            title="Select / Uncheck all products in current view"
+                            title="Select / Uncheck all products in current page view"
                           />
                         </th>
                         <th className="p-3.5">Item & SKU</th>
@@ -1716,7 +1839,7 @@ export default function AdminPage() {
                           </td>
                         </tr>
                       ) : (
-                        filteredProducts.map((prod) => {
+                        pagedProducts.map((prod) => {
                           const matchedCat = categories.find((c) => c.slug === prod.category_slug);
                           const matchedSub = matchedCat?.subcategories?.find((s) => s.slug === prod.subcategory_slug);
                           const isChecked = selectedProductIds.includes(String(prod.id));
@@ -1851,6 +1974,103 @@ export default function AdminPage() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* 20 Products Per Page Pagination */}
+                {totalProductPages > 1 && (() => {
+                  const pagesToShow = [];
+                  const maxButtons = 5;
+                  let startPage = Math.max(1, currentProductPage - 2);
+                  let endPage = Math.min(totalProductPages, startPage + maxButtons - 1);
+                  if (endPage - startPage + 1 < maxButtons) {
+                    startPage = Math.max(1, endPage - maxButtons + 1);
+                  }
+                  for (let i = startPage; i <= endPage; i++) {
+                    pagesToShow.push(i);
+                  }
+
+                  return (
+                    <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-white border-t border-slate-100 text-xs">
+                      <span className="text-slate-500 font-medium text-[11px]">
+                        Showing {(currentProductPage - 1) * productPageSize + 1} to{" "}
+                        {Math.min(currentProductPage * productPageSize, filteredProducts.length)} of {filteredProducts.length} products
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={currentProductPage <= 1}
+                          onClick={() => setProductPage(1)}
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 font-bold transition cursor-pointer"
+                          title="First Page"
+                        >
+                          &laquo;
+                        </button>
+                        <button
+                          type="button"
+                          disabled={currentProductPage <= 1}
+                          onClick={() => setProductPage((p) => Math.max(1, p - 1))}
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 font-bold transition cursor-pointer"
+                        >
+                          Prev
+                        </button>
+                        {startPage > 1 && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setProductPage(1)}
+                              className="w-7 h-7 rounded-lg text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                            >
+                              1
+                            </button>
+                            {startPage > 2 && <span className="text-slate-400 px-0.5">&hellip;</span>}
+                          </>
+                        )}
+                        {pagesToShow.map((pg) => (
+                          <button
+                            key={pg}
+                            type="button"
+                            onClick={() => setProductPage(pg)}
+                            className={`w-7 h-7 rounded-lg text-xs font-extrabold transition cursor-pointer ${
+                              pg === currentProductPage
+                                ? "bg-brand-pink text-white shadow-xs"
+                                : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+                            }`}
+                          >
+                            {pg}
+                          </button>
+                        ))}
+                        {endPage < totalProductPages && (
+                          <>
+                            {endPage < totalProductPages - 1 && <span className="text-slate-400 px-0.5">&hellip;</span>}
+                            <button
+                              type="button"
+                              onClick={() => setProductPage(totalProductPages)}
+                              className="w-7 h-7 rounded-lg text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                            >
+                              {totalProductPages}
+                            </button>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          disabled={currentProductPage >= totalProductPages}
+                          onClick={() => setProductPage((p) => Math.min(totalProductPages, p + 1))}
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 font-bold transition cursor-pointer"
+                        >
+                          Next
+                        </button>
+                        <button
+                          type="button"
+                          disabled={currentProductPage >= totalProductPages}
+                          onClick={() => setProductPage(totalProductPages)}
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 font-bold transition cursor-pointer"
+                          title="Last Page"
+                        >
+                          &raquo;
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           );
@@ -3093,7 +3313,7 @@ export default function AdminPage() {
                         <button
                           key={supp.storeID}
                           type="button"
-                          onClick={() => handleSelectSupplier(supp)}
+                          onClick={() => handleSelectSupplier(supp, 1)}
                           className={`p-3 rounded-xl border text-left text-xs transition relative ${
                             isSelected
                               ? "border-brand-pink bg-brand-softPink/60 shadow-xs ring-1 ring-brand-pink"
@@ -3229,10 +3449,10 @@ export default function AdminPage() {
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-3">
                   <div>
-                    <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                    <h3 className="text-sm font-black text-slate-900 flex items-center gap-2 flex-wrap">
                       <span>Live Products from {selectedHhcSupplier?.storeName || "ADVANI"}</span>
                       <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-                        {hhcSupplierProducts.length} Wholesale Items
+                        Page {hhcProductPage} of {hhcProductLastPage} &bull; {hhcProductTotal || selectedHhcSupplier?.productsCount || hhcSupplierProducts.length} Total Wholesale Items
                       </span>
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
@@ -3267,9 +3487,9 @@ export default function AdminPage() {
                         const targetItems = hhcSupplierProducts.filter((p) =>
                           selectedHhcProductIds.includes(p.id)
                         );
-                        handleBatchImportHhcProducts(targetItems);
+                        openBatchImportModal(targetItems);
                       }}
-                      className="px-4 py-2 bg-brand-pink hover:bg-brand-pinkHover text-white text-xs font-extrabold rounded-xl shadow-md shadow-brand-pink/20 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                      className="px-4 py-2 bg-brand-pink hover:bg-brand-pinkHover text-white text-xs font-extrabold rounded-xl shadow-md shadow-brand-pink/20 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>
@@ -3393,7 +3613,7 @@ export default function AdminPage() {
                             <button
                               type="button"
                               onClick={() => handleImportHhcProduct(item)}
-                              className="w-full py-2 bg-brand-pink hover:bg-brand-pinkHover text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-xs"
+                              className="w-full py-2 bg-brand-pink hover:bg-brand-pinkHover text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer"
                             >
                               <Plus className="w-4 h-4" />
                               <span>Import 1-Click</span>
@@ -3404,6 +3624,146 @@ export default function AdminPage() {
                     );
                   })}
                 </div>
+
+                {/* SUPPLIER PRODUCTS PAGINATION BAR */}
+                {hhcProductLastPage > 1 && (() => {
+                  const pagesToShow = [];
+                  const maxButtons = 5;
+                  let startPage = Math.max(1, hhcProductPage - 2);
+                  let endPage = Math.min(hhcProductLastPage, startPage + maxButtons - 1);
+                  if (endPage - startPage + 1 < maxButtons) {
+                    startPage = Math.max(1, endPage - maxButtons + 1);
+                  }
+                  for (let i = startPage; i <= endPage; i++) pagesToShow.push(i);
+
+                  return (
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100 text-xs">
+                      <span className="text-slate-500 text-[11px] font-medium">
+                        Showing Page {hhcProductPage} of {hhcProductLastPage} &bull; {hhcProductTotal || selectedHhcSupplier?.productsCount || 0} Total Wholesale Items from {selectedHhcSupplier?.storeName}
+                      </span>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={hhcProductPage <= 1 || hhcImportLoading}
+                          onClick={() => {
+                            if (selectedHhcSupplier) {
+                              setSelectedHhcProductIds([]);
+                              handleSelectSupplier(selectedHhcSupplier, 1);
+                            }
+                          }}
+                          className="px-2 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
+                          title="First Page"
+                        >
+                          &laquo;
+                        </button>
+                        <button
+                          type="button"
+                          disabled={hhcProductPage <= 1 || hhcImportLoading}
+                          onClick={() => {
+                            if (selectedHhcSupplier) {
+                              setSelectedHhcProductIds([]);
+                              handleSelectSupplier(selectedHhcSupplier, Math.max(1, hhcProductPage - 1));
+                            }
+                          }}
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
+                        >
+                          Prev
+                        </button>
+
+                        {startPage > 1 && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={hhcImportLoading}
+                              onClick={() => {
+                                if (selectedHhcSupplier) {
+                                  setSelectedHhcProductIds([]);
+                                  handleSelectSupplier(selectedHhcSupplier, 1);
+                                }
+                              }}
+                              className="w-7 h-7 rounded-lg text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                            >
+                              1
+                            </button>
+                            {startPage > 2 && <span className="text-slate-300 px-0.5">&hellip;</span>}
+                          </>
+                        )}
+
+                        {pagesToShow.map((pg) => {
+                          const isActive = pg === hhcProductPage;
+                          return (
+                            <button
+                              key={pg}
+                              type="button"
+                              disabled={hhcImportLoading}
+                              onClick={() => {
+                                if (selectedHhcSupplier) {
+                                  setSelectedHhcProductIds([]);
+                                  handleSelectSupplier(selectedHhcSupplier, pg);
+                                }
+                              }}
+                              className={`w-7 h-7 rounded-lg text-xs font-extrabold transition cursor-pointer ${
+                                isActive
+                                  ? "bg-brand-pink text-white shadow-xs"
+                                  : "border border-slate-200 text-slate-700 hover:bg-slate-100"
+                              }`}
+                            >
+                              {pg}
+                            </button>
+                          );
+                        })}
+
+                        {endPage < hhcProductLastPage && (
+                          <>
+                            {endPage < hhcProductLastPage - 1 && <span className="text-slate-300 px-0.5">&hellip;</span>}
+                            <button
+                              type="button"
+                              disabled={hhcImportLoading}
+                              onClick={() => {
+                                if (selectedHhcSupplier) {
+                                  setSelectedHhcProductIds([]);
+                                  handleSelectSupplier(selectedHhcSupplier, hhcProductLastPage);
+                                }
+                              }}
+                              className="w-7 h-7 rounded-lg text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                            >
+                              {hhcProductLastPage}
+                            </button>
+                          </>
+                        )}
+
+                        <button
+                          type="button"
+                          disabled={hhcProductPage >= hhcProductLastPage || hhcImportLoading}
+                          onClick={() => {
+                            if (selectedHhcSupplier) {
+                              setSelectedHhcProductIds([]);
+                              handleSelectSupplier(selectedHhcSupplier, Math.min(hhcProductLastPage, hhcProductPage + 1));
+                            }
+                          }}
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
+                        >
+                          Next
+                        </button>
+                        <button
+                          type="button"
+                          disabled={hhcProductPage >= hhcProductLastPage || hhcImportLoading}
+                          onClick={() => {
+                            if (selectedHhcSupplier) {
+                              setSelectedHhcProductIds([]);
+                              handleSelectSupplier(selectedHhcSupplier, hhcProductLastPage);
+                            }
+                          }}
+                          className="px-2 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
+                          title="Last Page"
+                        >
+                          &raquo;
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           );
@@ -3654,8 +4014,16 @@ export default function AdminPage() {
         {/* ==========================================
             TAB 5D: HHC STOCK & PRICE SYNCHRONIZATION
         =========================================== */}
-        {activeTab === "hhc-sync" && (
-          <div className="space-y-6">
+        {activeTab === "hhc-sync" && (() => {
+          const totalSyncPages = Math.max(1, Math.ceil(products.length / syncPageSize));
+          const currentSyncPage = Math.min(syncPage, totalSyncPages);
+          const pagedSyncProducts = products.slice(
+            (currentSyncPage - 1) * syncPageSize,
+            currentSyncPage * syncPageSize
+          );
+
+          return (
+            <div className="space-y-6">
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -3726,7 +4094,7 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
-                    {products.map((p) => {
+                    {pagedSyncProducts.map((p) => {
                       const wholesale = Math.round(p.price * 0.65);
                       const margin = p.price - wholesale;
                       return (
@@ -3763,9 +4131,107 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* 20 Items Per Page Sync Pagination */}
+              {totalSyncPages > 1 && (() => {
+                const pagesToShow = [];
+                const maxButtons = 5;
+                let startPage = Math.max(1, currentSyncPage - 2);
+                let endPage = Math.min(totalSyncPages, startPage + maxButtons - 1);
+                if (endPage - startPage + 1 < maxButtons) {
+                  startPage = Math.max(1, endPage - maxButtons + 1);
+                }
+                for (let i = startPage; i <= endPage; i++) {
+                  pagesToShow.push(i);
+                }
+
+                return (
+                  <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-white border-t border-slate-100 text-xs">
+                    <span className="text-slate-500 font-medium text-[11px]">
+                      Showing {(currentSyncPage - 1) * syncPageSize + 1} to{" "}
+                      {Math.min(currentSyncPage * syncPageSize, products.length)} of {products.length} catalog items (Page {currentSyncPage} of {totalSyncPages})
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={currentSyncPage <= 1}
+                        onClick={() => setSyncPage(1)}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 font-bold transition cursor-pointer"
+                        title="First Page"
+                      >
+                        &laquo;
+                      </button>
+                      <button
+                        type="button"
+                        disabled={currentSyncPage <= 1}
+                        onClick={() => setSyncPage((p) => Math.max(1, p - 1))}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 font-bold transition cursor-pointer"
+                      >
+                        Prev
+                      </button>
+                      {startPage > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setSyncPage(1)}
+                            className="w-7 h-7 rounded-lg text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                          >
+                            1
+                          </button>
+                          {startPage > 2 && <span className="text-slate-400 px-0.5">&hellip;</span>}
+                        </>
+                      )}
+                      {pagesToShow.map((pg) => (
+                        <button
+                          key={pg}
+                          type="button"
+                          onClick={() => setSyncPage(pg)}
+                          className={`w-7 h-7 rounded-lg text-xs font-extrabold transition cursor-pointer ${
+                            pg === currentSyncPage
+                              ? "bg-brand-pink text-white shadow-xs"
+                              : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          {pg}
+                        </button>
+                      ))}
+                      {endPage < totalSyncPages && (
+                        <>
+                          {endPage < totalSyncPages - 1 && <span className="text-slate-400 px-0.5">&hellip;</span>}
+                          <button
+                            type="button"
+                            onClick={() => setSyncPage(totalSyncPages)}
+                            className="w-7 h-7 rounded-lg text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                          >
+                            {totalSyncPages}
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        disabled={currentSyncPage >= totalSyncPages}
+                        onClick={() => setSyncPage((p) => Math.min(totalSyncPages, p + 1))}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 font-bold transition cursor-pointer"
+                      >
+                        Next
+                      </button>
+                      <button
+                        type="button"
+                        disabled={currentSyncPage >= totalSyncPages}
+                        onClick={() => setSyncPage(totalSyncPages)}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 font-bold transition cursor-pointer"
+                        title="Last Page"
+                      >
+                        &raquo;
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
-        )}
+        );
+      })()}
 
         {/* ==========================================
             TAB 5E: HHC RCP & RETURNS CENTER
@@ -5585,6 +6051,180 @@ export default function AdminPage() {
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Yes, Clear All</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL 8: BATCH IMPORT CATEGORY REVIEW MODAL
+      =========================================== */}
+      {batchImportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-2xl bg-brand-pink/10 text-brand-pink flex items-center justify-center">
+                  <Download className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Import Products into Store Catalogue
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Select target category and verify wholesale pricing before importing into Abrish Mart.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBatchImportModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Target Category Selector */}
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
+              <label className="block text-xs font-black text-slate-800">
+                Target Store Category:
+              </label>
+              <select
+                value={batchImportTargetCategory}
+                onChange={(e) => setBatchImportTargetCategory(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-pink cursor-pointer"
+              >
+                <option value="auto">⚡ Auto-Detect per Product (Match by Title & Supplier Category)</option>
+                {categories
+                  .filter((c) => !c.parent_slug || c.parent_slug === "")
+                  .map((c) => (
+                    <option key={c.slug} value={c.slug}>
+                      📁 {c.name}
+                    </option>
+                  ))}
+              </select>
+              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                <span>
+                  Profit Margin Applied:{" "}
+                  <strong className="text-slate-900">
+                    {hhcMarginType === "fixed" ? `+Rs. ${hhcMarginValue} Fixed` : `${hhcMarginValue}% Percentage`}
+                  </strong>
+                </span>
+                <span className="text-brand-pink font-bold">
+                  {batchImportSelectedIds.length} of {batchImportProducts.length} items checked
+                </span>
+              </div>
+            </div>
+
+            {/* Selection Toolbar */}
+            <div className="flex items-center justify-between text-xs px-1">
+              <span className="text-slate-500 font-medium text-[11px]">
+                Review items to import:
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBatchImportSelectedIds(batchImportProducts.map((p) => p.id))}
+                  className="text-[11px] font-bold text-brand-pink hover:underline cursor-pointer"
+                >
+                  Select All ({batchImportProducts.length})
+                </button>
+                <span className="text-slate-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => setBatchImportSelectedIds([])}
+                  className="text-[11px] font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
+                >
+                  Uncheck All
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Products List */}
+            <div className="flex-1 overflow-y-auto space-y-2 max-h-72 border border-slate-100 rounded-2xl p-2 bg-slate-50/50 divide-y divide-slate-100">
+              {batchImportProducts.map((item) => {
+                const isChecked = batchImportSelectedIds.includes(item.id);
+                const pricing = calculateHhcSellingPrice(item.wholesalePrice, hhcMarginType, hhcMarginValue);
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      if (isChecked) {
+                        setBatchImportSelectedIds((prev) => prev.filter((id) => id !== item.id));
+                      } else {
+                        setBatchImportSelectedIds((prev) => [...prev, item.id]);
+                      }
+                    }}
+                    className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition ${
+                      isChecked ? "bg-white shadow-xs border border-brand-pink/30" : "opacity-60 hover:opacity-100"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => {}}
+                      className="w-4 h-4 rounded text-brand-pink focus:ring-brand-pink cursor-pointer shrink-0"
+                    />
+                    <div className="relative w-11 h-11 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                      <Image
+                        src={item.thumbnail || "/images/banners/hero-banner.png"}
+                        alt={item.name}
+                        fill
+                        sizes="44px"
+                        className="object-cover"
+                        unoptimized
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-slate-900 truncate">{item.name}</p>
+                      <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                        {item.sku || `HHC-${item.id}`} &bull; {item.category || "General"}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0 text-xs">
+                      <div className="font-extrabold text-slate-900">
+                        Rs. {pricing.salePrice.toLocaleString()}
+                      </div>
+                      <div className="text-[10px] text-emerald-600 font-bold">
+                        Cost Rs. {item.wholesalePrice} (+Rs. {pricing.margin})
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={batchImporting}
+                onClick={() => setBatchImportModalOpen(false)}
+                className="px-4 py-2 border border-slate-300 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={batchImporting || batchImportSelectedIds.length === 0}
+                onClick={handleConfirmBatchImport}
+                className="px-5 py-2.5 bg-brand-pink hover:bg-brand-pinkHover text-white text-xs font-black rounded-xl shadow-md shadow-brand-pink/20 transition flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {batchImporting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Importing into Catalogue...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>Confirm Import ({batchImportSelectedIds.length} Products)</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

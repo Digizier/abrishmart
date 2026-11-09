@@ -293,7 +293,13 @@ export async function hhcSyncAllLiveSuppliers(): Promise<{
 export async function hhcGetProductsBySupplier(
   storeId: number | string,
   page: number = 1
-): Promise<{ success: boolean; data: HHCCatalogItem[] }> {
+): Promise<{
+  success: boolean;
+  data: HHCCatalogItem[];
+  total: number;
+  currentPage: number;
+  lastPage: number;
+}> {
   const numericStoreId = Number(storeId);
 
   try {
@@ -310,6 +316,10 @@ export async function hhcGetProductsBySupplier(
     if (res.ok) {
       const json = await res.json();
       const rawProducts = json.data || (Array.isArray(json) ? json : []);
+      const totalCount = Number(json.total) || rawProducts.length;
+      const perPage = Number(json.per_page) || 15;
+      const calculatedLastPage = Math.max(1, Math.ceil(totalCount / perPage));
+
       if (rawProducts.length > 0) {
         const normalized: HHCCatalogItem[] = rawProducts.map((p: any) => {
           const wholesale = parseFloat(p.wholesalePrice || p.price || 300);
@@ -371,7 +381,13 @@ export async function hhcGetProductsBySupplier(
             sku: p.sku || `HHC-${p.id}`,
           };
         });
-        return { success: true, data: normalized };
+        return {
+          success: true,
+          data: normalized,
+          total: totalCount,
+          currentPage: Number(json.current_page) || page,
+          lastPage: calculatedLastPage,
+        };
       }
     }
   } catch {
@@ -383,9 +399,13 @@ export async function hhcGetProductsBySupplier(
     (p) => numericStoreId === 0 || p.storeID === numericStoreId
   );
 
+  const fallbackData = matched.length > 0 ? matched : HHC_CATALOG_PRODUCTS;
   return {
     success: true,
-    data: matched.length > 0 ? matched : HHC_CATALOG_PRODUCTS,
+    data: fallbackData,
+    total: fallbackData.length,
+    currentPage: 1,
+    lastPage: Math.max(1, Math.ceil(fallbackData.length / 15)),
   };
 }
 
