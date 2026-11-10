@@ -227,10 +227,21 @@ export default function AdminPage() {
   const [hhcProductPage, setHhcProductPage] = useState(1);
   const [hhcProductTotal, setHhcProductTotal] = useState(0);
   const [hhcProductLastPage, setHhcProductLastPage] = useState(1);
+  const [hhcProductPageSize, setHhcProductPageSize] = useState<number>(100);
+
+  // Single Product Import Category Confirmation Modal
+  const [singleImportModalOpen, setSingleImportModalOpen] = useState(false);
+  const [singleImportItem, setSingleImportItem] = useState<HHCCatalogItem | null>(null);
+  const [singleImportCategory, setSingleImportCategory] = useState<string>("kitchen");
+  const [singleImportSubcategory, setSingleImportSubcategory] = useState<string>("");
+  const [singleImportSalePrice, setSingleImportSalePrice] = useState<number>(0);
+  const [singleImportOriginalPrice, setSingleImportOriginalPrice] = useState<number>(0);
+  const [singleImporting, setSingleImporting] = useState(false);
 
   // Batch Import Category Review Modal
   const [batchImportModalOpen, setBatchImportModalOpen] = useState(false);
   const [batchImportTargetCategory, setBatchImportTargetCategory] = useState("auto");
+  const [batchImportTargetSubcategory, setBatchImportTargetSubcategory] = useState<string>("");
   const [batchImportProducts, setBatchImportProducts] = useState<HHCCatalogItem[]>([]);
   const [batchImportSelectedIds, setBatchImportSelectedIds] = useState<number[]>([]);
   const [batchImporting, setBatchImporting] = useState(false);
@@ -405,8 +416,12 @@ export default function AdminPage() {
       hhcGetSuppliers(1).then((res) => {
         if (res.data && res.data.length > 0) {
           setHhcSuppliers(res.data);
+          const initialSupp = selectedHhcSupplier || res.data[0];
           if (!selectedHhcSupplier) {
-            setSelectedHhcSupplier(res.data[0]);
+            setSelectedHhcSupplier(initialSupp);
+          }
+          if (activeTab === "hhc-importer" && hhcProductTotal === 0) {
+            handleSelectSupplier(initialSupp, 1, hhcProductPageSize);
           }
         }
       });
@@ -458,23 +473,141 @@ export default function AdminPage() {
     }
   };
 
-  // Load products when selected supplier changes
-  const handleSelectSupplier = async (supp: HHCSupplier, page: number = 1) => {
+  // Load products when selected supplier changes (supports 15, 50, or 100 items per view)
+  const handleSelectSupplier = async (
+    supp: HHCSupplier,
+    page: number = 1,
+    pageSize: number = hhcProductPageSize
+  ) => {
     setSelectedHhcSupplier(supp);
     setHhcProductPage(page);
     setHhcImportLoading(true);
     try {
-      const res = await hhcGetProductsBySupplier(supp.storeID, page);
+      const res = await hhcGetProductsBySupplier(supp.storeID, page, pageSize);
       if (res.data) {
         setHhcSupplierProducts(res.data);
         const total = res.total || supp.productsCount || 0;
         setHhcProductTotal(total);
-        setHhcProductLastPage(res.lastPage || Math.max(1, Math.ceil(total / 15)));
+        setHhcProductLastPage(res.lastPage || Math.max(1, Math.ceil(total / pageSize)));
       }
     } catch (err: unknown) {
       console.warn("Error loading supplier products:", err);
     } finally {
       setHhcImportLoading(false);
+    }
+  };
+
+  // Open Single Product Import Category Confirmation Modal
+  const openSingleImportModal = (item: HHCCatalogItem) => {
+    setSingleImportItem(item);
+    const nameLower = item.name.toLowerCase();
+    let matchedCat = categories.find((c) =>
+      c.name.toLowerCase().includes(item.category.toLowerCase()) ||
+      item.category.toLowerCase().includes(c.name.toLowerCase())
+    );
+    if (!matchedCat) {
+      if (nameLower.includes("lip") || nameLower.includes("cream") || nameLower.includes("serum") || nameLower.includes("beauty") || nameLower.includes("whitening") || nameLower.includes("makeup") || nameLower.includes("hair") || nameLower.includes("perfume") || nameLower.includes("face") || nameLower.includes("cosmetic")) {
+        matchedCat = categories.find((c) => c.slug === "beauty-personal-care");
+      } else if (nameLower.includes("kitchen") || nameLower.includes("cook") || nameLower.includes("slicer") || nameLower.includes("bottle") || nameLower.includes("pan") || nameLower.includes("knife") || nameLower.includes("masher")) {
+        matchedCat = categories.find((c) => c.slug === "kitchen");
+      } else if (nameLower.includes("toy") || nameLower.includes("kid") || nameLower.includes("puzzle") || nameLower.includes("game") || nameLower.includes("doll") || nameLower.includes("rc")) {
+        matchedCat = categories.find((c) => c.slug === "toys");
+      } else if (nameLower.includes("watch") || nameLower.includes("strap") || nameLower.includes("dress") || nameLower.includes("fashion") || nameLower.includes("cloth") || nameLower.includes("shirt")) {
+        matchedCat = categories.find((c) => c.slug === "fashion");
+      } else if (nameLower.includes("baby") || nameLower.includes("infant") || nameLower.includes("diaper") || nameLower.includes("feeder")) {
+        matchedCat = categories.find((c) => c.slug === "baby-kids");
+      } else if (nameLower.includes("bag") || nameLower.includes("backpack") || nameLower.includes("shoe") || nameLower.includes("slipper") || nameLower.includes("sneaker")) {
+        matchedCat = categories.find((c) => c.slug === "bags-footwear");
+      } else if (nameLower.includes("gym") || nameLower.includes("fit") || nameLower.includes("belt") || nameLower.includes("health") || nameLower.includes("slimming") || nameLower.includes("massage")) {
+        matchedCat = categories.find((c) => c.slug === "health-fitness");
+      } else if (nameLower.includes("headphone") || nameLower.includes("earbud") || nameLower.includes("cable") || nameLower.includes("charger") || nameLower.includes("electronic") || nameLower.includes("led") || nameLower.includes("speaker") || nameLower.includes("mobile")) {
+        matchedCat = categories.find((c) => c.slug === "electronics-mobile");
+      } else if (nameLower.includes("bed") || nameLower.includes("sheet") || nameLower.includes("pillow") || nameLower.includes("carpet") || nameLower.includes("mat") || nameLower.includes("decor") || nameLower.includes("organizer") || nameLower.includes("curtain")) {
+        matchedCat = categories.find((c) => c.slug === "home-living");
+      } else if (nameLower.includes("pen") || nameLower.includes("pencil") || nameLower.includes("gift") || nameLower.includes("notebook") || nameLower.includes("stationery") || nameLower.includes("diary")) {
+        matchedCat = categories.find((c) => c.slug === "stationery-gifts");
+      } else if (nameLower.includes("tool") || nameLower.includes("car") || nameLower.includes("repair") || nameLower.includes("drill") || nameLower.includes("tape") || nameLower.includes("auto")) {
+        matchedCat = categories.find((c) => c.slug === "tools-auto");
+      } else if (nameLower.includes("pet") || nameLower.includes("cat") || nameLower.includes("dog") || nameLower.includes("plant") || nameLower.includes("garden") || nameLower.includes("seed")) {
+        matchedCat = categories.find((c) => c.slug === "pets-garden");
+      }
+    }
+
+    const targetSlug = matchedCat?.slug || categories[0]?.slug || "kitchen";
+    setSingleImportCategory(targetSlug);
+
+    const parentCat = categories.find((c) => c.slug === targetSlug);
+    const matchedSub = parentCat?.subcategories?.find((s) =>
+      nameLower.includes(s.name.toLowerCase()) || nameLower.includes(s.slug.replace(/-/g, " "))
+    );
+    setSingleImportSubcategory(matchedSub ? matchedSub.slug : "");
+
+    const pricing = calculateHhcSellingPrice(item.wholesalePrice, hhcMarginType, hhcMarginValue);
+    setSingleImportSalePrice(pricing.salePrice);
+    setSingleImportOriginalPrice(Math.round(pricing.salePrice * 1.35));
+    setSingleImportModalOpen(true);
+  };
+
+  // Confirm Single Product Import
+  const handleConfirmSingleImport = async () => {
+    if (!singleImportItem) return;
+    setSingleImporting(true);
+    try {
+      const pricing = calculateHhcSellingPrice(singleImportItem.wholesalePrice, hhcMarginType, hhcMarginValue);
+      const finalSalePrice = singleImportSalePrice > 0 ? singleImportSalePrice : pricing.salePrice;
+      const finalOrigPrice = singleImportOriginalPrice > 0 ? singleImportOriginalPrice : Math.round(finalSalePrice * 1.35);
+
+      const newProduct: Partial<Product> = {
+        title: singleImportItem.name,
+        slug:
+          singleImportItem.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "") +
+          "-" +
+          Math.floor(100 + Math.random() * 900),
+        description: singleImportItem.description || "High quality product sourced from HHC Dropshipping Pakistan.",
+        price: finalSalePrice,
+        original_price: finalOrigPrice,
+        wholesale_price: singleImportItem.wholesalePrice,
+        stock: singleImportItem.stock || 40,
+        thumbnail_url: singleImportItem.thumbnail,
+        gallery_urls: singleImportItem.gallery && singleImportItem.gallery.length > 0 ? singleImportItem.gallery : [singleImportItem.thumbnail],
+        category_slug: singleImportCategory,
+        subcategory_slug: singleImportSubcategory || undefined,
+        is_active: true,
+        is_featured: true,
+        is_flash_deal: false,
+        sku: singleImportItem.sku || `HHC-${singleImportItem.id}`,
+        hhc_product_id: singleImportItem.id,
+        hhc_store_id: singleImportItem.storeID,
+        rating: 4.8,
+        reviews_count: Math.floor(15 + Math.random() * 45),
+        created_at: new Date().toISOString(),
+      };
+
+      const res = await adminSaveProduct(newProduct);
+      if (res.success) {
+        setHhcLogs((prev) => [
+          {
+            timestamp: new Date().toLocaleTimeString(),
+            action: "PRODUCT_IMPORTED",
+            details: `"${singleImportItem.name.slice(0, 32)}..." imported into [${singleImportCategory}${singleImportSubcategory ? " / " + singleImportSubcategory : ""}] (Wholesale: Rs. ${singleImportItem.wholesalePrice} ➔ Sale: Rs. ${finalSalePrice})`,
+          },
+          ...prev,
+        ]);
+        showToast(`✅ Successfully imported "${singleImportItem.name.slice(0, 25)}..." into ${singleImportCategory}!`);
+        setSingleImportModalOpen(false);
+        setSingleImportItem(null);
+        loadData(false);
+      } else {
+        showToast(`❌ Import error: ${res.error}`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Import failed";
+      showToast(`❌ Import error: ${msg}`);
+    } finally {
+      setSingleImporting(false);
     }
   };
 
@@ -487,10 +620,11 @@ export default function AdminPage() {
     setBatchImportProducts(items);
     setBatchImportSelectedIds(items.map((i) => i.id));
     setBatchImportTargetCategory("auto");
+    setBatchImportTargetSubcategory("");
     setBatchImportModalOpen(true);
   };
 
-  // Confirm Batch Import with Category
+  // Confirm Batch Import with Category & Subcategory
   const handleConfirmBatchImport = async () => {
     const itemsToImport = batchImportProducts.filter((p) => batchImportSelectedIds.includes(p.id));
     if (itemsToImport.length === 0) {
@@ -504,15 +638,24 @@ export default function AdminPage() {
       for (const item of itemsToImport) {
         const pricing = calculateHhcSellingPrice(item.wholesalePrice, hhcMarginType, hhcMarginValue);
         let targetCatSlug = "";
+        let targetSubcatSlug: string | undefined = undefined;
+
         if (batchImportTargetCategory !== "auto") {
           targetCatSlug = batchImportTargetCategory;
+          targetSubcatSlug = batchImportTargetSubcategory || undefined;
         } else {
+          const nameLower = item.name.toLowerCase();
           const matched = categories.find(
             (c) =>
               c.name.toLowerCase().includes(item.category.toLowerCase()) ||
               c.slug.toLowerCase().includes(item.category.toLowerCase())
           );
           targetCatSlug = matched?.slug || categories[0]?.slug || "home-living";
+          const parentCat = categories.find((c) => c.slug === targetCatSlug);
+          const matchedSub = parentCat?.subcategories?.find(
+            (s) => nameLower.includes(s.name.toLowerCase()) || nameLower.includes(s.slug.replace(/-/g, " "))
+          );
+          targetSubcatSlug = matchedSub?.slug || undefined;
         }
 
         const newProduct: Partial<Product> = {
@@ -532,10 +675,13 @@ export default function AdminPage() {
           thumbnail_url: item.thumbnail,
           gallery_urls: item.gallery && item.gallery.length > 0 ? item.gallery : [item.thumbnail],
           category_slug: targetCatSlug,
+          subcategory_slug: targetSubcatSlug,
           is_active: true,
           is_featured: true,
           is_flash_deal: false,
           sku: item.sku || `HHC-${item.id}`,
+          hhc_product_id: item.id,
+          hhc_store_id: item.storeID,
           rating: 4.8,
           reviews_count: Math.floor(15 + Math.random() * 45),
         };
@@ -1466,7 +1612,12 @@ export default function AdminPage() {
 
                 <button
                   type="button"
-                  onClick={() => setActiveTab("hhc-importer")}
+                  onClick={() => {
+                    setActiveTab("hhc-importer");
+                    if (selectedHhcSupplier && hhcProductTotal === 0) {
+                      handleSelectSupplier(selectedHhcSupplier, 1, hhcProductPageSize);
+                    }
+                  }}
                   className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-[11px] font-medium transition ${
                     activeTab === "hhc-importer"
                       ? "bg-brand-pink text-white font-bold shadow-xs"
@@ -1478,7 +1629,7 @@ export default function AdminPage() {
                     Import Products
                   </span>
                   <span className="text-[9px] px-1 bg-slate-800 text-slate-300 rounded font-mono">
-                    10 Hubs
+                    {hhcSuppliers.length > 0 ? `${hhcSuppliers.length} Hubs` : "368 Hubs"}
                   </span>
                 </button>
 
@@ -3447,7 +3598,7 @@ export default function AdminPage() {
 
               {/* Products Grid from Selected Supplier */}
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-3">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-slate-100 pb-3 gap-3">
                   <div>
                     <h3 className="text-sm font-black text-slate-900 flex items-center gap-2 flex-wrap">
                       <span>Live Products from {selectedHhcSupplier?.storeName || "ADVANI"}</span>
@@ -3460,24 +3611,66 @@ export default function AdminPage() {
                     </p>
                   </div>
 
-                  {/* BULK IMPORT CONTROLS (TICK / UNCHECK & IMPORT ALL) */}
-                  <div className="flex items-center gap-3">
-                    {unimportedProducts.length > 0 && (
-                      <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
-                        <input
-                          type="checkbox"
-                          checked={isAllSelected}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedHhcProductIds(unimportedProducts.map((p) => p.id));
-                            } else {
+                  {/* PRODUCTS PER VIEW & BULK IMPORT CONTROLS */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Page Size Selector: 15 | 50 | 100 */}
+                    <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 p-1 rounded-xl text-xs">
+                      <span className="text-[11px] font-bold text-slate-500 px-1">View:</span>
+                      {[15, 50, 100].map((size) => (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => {
+                            setHhcProductPageSize(size);
+                            if (selectedHhcSupplier) {
                               setSelectedHhcProductIds([]);
+                              handleSelectSupplier(selectedHhcSupplier, 1, size);
                             }
                           }}
-                          className="rounded text-brand-pink focus:ring-brand-pink cursor-pointer"
-                        />
-                        <span>Select All ({unimportedProducts.length})</span>
-                      </label>
+                          className={`px-2.5 py-1 rounded-lg text-xs font-extrabold transition cursor-pointer ${
+                            hhcProductPageSize === size
+                              ? "bg-brand-pink text-white shadow-xs"
+                              : "text-slate-600 hover:bg-slate-200/60"
+                          }`}
+                        >
+                          {size} items {size === 100 ? "(100 Max)" : ""}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* SELECT ALL (Checkbox & All Products Button) */}
+                    {unimportedProducts.length > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 transition">
+                          <input
+                            type="checkbox"
+                            checked={isAllSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedHhcProductIds(unimportedProducts.map((p) => p.id));
+                              } else {
+                                setSelectedHhcProductIds([]);
+                              }
+                            }}
+                            className="w-4 h-4 rounded text-brand-pink focus:ring-brand-pink cursor-pointer"
+                          />
+                          <span>Select All ({unimportedProducts.length})</span>
+                        </label>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedHhcProductIds.length === unimportedProducts.length) {
+                              setSelectedHhcProductIds([]);
+                            } else {
+                              setSelectedHhcProductIds(unimportedProducts.map((p) => p.id));
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 transition cursor-pointer"
+                        >
+                          {selectedHhcProductIds.length === unimportedProducts.length ? "Deselect" : "All Products"}
+                        </button>
+                      </div>
                     )}
 
                     <button
@@ -3612,7 +3805,7 @@ export default function AdminPage() {
                           ) : (
                             <button
                               type="button"
-                              onClick={() => handleImportHhcProduct(item)}
+                              onClick={() => openSingleImportModal(item)}
                               className="w-full py-2 bg-brand-pink hover:bg-brand-pinkHover text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer"
                             >
                               <Plus className="w-4 h-4" />
@@ -3649,7 +3842,7 @@ export default function AdminPage() {
                           onClick={() => {
                             if (selectedHhcSupplier) {
                               setSelectedHhcProductIds([]);
-                              handleSelectSupplier(selectedHhcSupplier, 1);
+                              handleSelectSupplier(selectedHhcSupplier, 1, hhcProductPageSize);
                             }
                           }}
                           className="px-2 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
@@ -3663,7 +3856,7 @@ export default function AdminPage() {
                           onClick={() => {
                             if (selectedHhcSupplier) {
                               setSelectedHhcProductIds([]);
-                              handleSelectSupplier(selectedHhcSupplier, Math.max(1, hhcProductPage - 1));
+                              handleSelectSupplier(selectedHhcSupplier, Math.max(1, hhcProductPage - 1), hhcProductPageSize);
                             }
                           }}
                           className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
@@ -3679,7 +3872,7 @@ export default function AdminPage() {
                               onClick={() => {
                                 if (selectedHhcSupplier) {
                                   setSelectedHhcProductIds([]);
-                                  handleSelectSupplier(selectedHhcSupplier, 1);
+                                  handleSelectSupplier(selectedHhcSupplier, 1, hhcProductPageSize);
                                 }
                               }}
                               className="w-7 h-7 rounded-lg text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-100 transition cursor-pointer"
@@ -3700,7 +3893,7 @@ export default function AdminPage() {
                               onClick={() => {
                                 if (selectedHhcSupplier) {
                                   setSelectedHhcProductIds([]);
-                                  handleSelectSupplier(selectedHhcSupplier, pg);
+                                  handleSelectSupplier(selectedHhcSupplier, pg, hhcProductPageSize);
                                 }
                               }}
                               className={`w-7 h-7 rounded-lg text-xs font-extrabold transition cursor-pointer ${
@@ -3723,7 +3916,7 @@ export default function AdminPage() {
                               onClick={() => {
                                 if (selectedHhcSupplier) {
                                   setSelectedHhcProductIds([]);
-                                  handleSelectSupplier(selectedHhcSupplier, hhcProductLastPage);
+                                  handleSelectSupplier(selectedHhcSupplier, hhcProductLastPage, hhcProductPageSize);
                                 }
                               }}
                               className="w-7 h-7 rounded-lg text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-100 transition cursor-pointer"
@@ -3739,7 +3932,7 @@ export default function AdminPage() {
                           onClick={() => {
                             if (selectedHhcSupplier) {
                               setSelectedHhcProductIds([]);
-                              handleSelectSupplier(selectedHhcSupplier, Math.min(hhcProductLastPage, hhcProductPage + 1));
+                              handleSelectSupplier(selectedHhcSupplier, Math.min(hhcProductLastPage, hhcProductPage + 1), hhcProductPageSize);
                             }
                           }}
                           className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
@@ -3752,7 +3945,7 @@ export default function AdminPage() {
                           onClick={() => {
                             if (selectedHhcSupplier) {
                               setSelectedHhcProductIds([]);
-                              handleSelectSupplier(selectedHhcSupplier, hhcProductLastPage);
+                              handleSelectSupplier(selectedHhcSupplier, hhcProductLastPage, hhcProductPageSize);
                             }
                           }}
                           className="px-2 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
@@ -6087,26 +6280,63 @@ export default function AdminPage() {
               </button>
             </div>
 
-            {/* Target Category Selector */}
-            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
-              <label className="block text-xs font-black text-slate-800">
-                Target Store Category:
-              </label>
-              <select
-                value={batchImportTargetCategory}
-                onChange={(e) => setBatchImportTargetCategory(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-pink cursor-pointer"
-              >
-                <option value="auto">⚡ Auto-Detect per Product (Match by Title & Supplier Category)</option>
-                {categories
-                  .filter((c) => !c.parent_slug || c.parent_slug === "")
-                  .map((c) => (
-                    <option key={c.slug} value={c.slug}>
-                      📁 {c.name}
-                    </option>
-                  ))}
-              </select>
-              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+            {/* Target Category & Subcategory Selectors */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* 1. Main Category */}
+                <div>
+                  <label className="block text-xs font-black text-slate-800 mb-1">
+                    1. Main Store Category:
+                  </label>
+                  <select
+                    value={batchImportTargetCategory}
+                    onChange={(e) => {
+                      setBatchImportTargetCategory(e.target.value);
+                      setBatchImportTargetSubcategory("");
+                    }}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-pink cursor-pointer"
+                  >
+                    <option value="auto">⚡ Auto-Detect per Product (Title & HHC Match)</option>
+                    {categories
+                      .filter((c) => !c.parent_slug || c.parent_slug === "")
+                      .map((c) => (
+                        <option key={c.slug} value={c.slug}>
+                          📁 {c.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                {/* 2. Subcategory */}
+                <div>
+                  <label className="block text-xs font-black text-slate-800 mb-1">
+                    2. Subcategory (Optional):
+                  </label>
+                  <select
+                    disabled={batchImportTargetCategory === "auto"}
+                    value={batchImportTargetSubcategory}
+                    onChange={(e) => setBatchImportTargetSubcategory(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-pink cursor-pointer disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    {batchImportTargetCategory === "auto" ? (
+                      <option value="">-- Auto-Detect per Product --</option>
+                    ) : (
+                      <>
+                        <option value="">-- None (Main Category Only) --</option>
+                        {categories
+                          .find((c) => c.slug === batchImportTargetCategory)
+                          ?.subcategories?.map((sub) => (
+                            <option key={sub.slug} value={sub.slug}>
+                              ↳ {sub.name}
+                            </option>
+                          ))}
+                      </>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200">
                 <span>
                   Profit Margin Applied:{" "}
                   <strong className="text-slate-900">
@@ -6230,6 +6460,187 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* ==========================================
+          MODAL 9: SINGLE PRODUCT IMPORT CATEGORY CONFIRMATION MODAL
+      =========================================== */}
+      {singleImportModalOpen && singleImportItem && (() => {
+        const selectedParentCat = categories.find((c) => c.slug === singleImportCategory);
+        const subcategoriesList = selectedParentCat?.subcategories || [];
+        const profit = singleImportSalePrice - singleImportItem.wholesalePrice;
+
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-2xl bg-brand-pink/10 text-brand-pink flex items-center justify-center">
+                    <Plus className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">
+                      Import Product to Store
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Confirm category, subcategory, and pricing before publishing.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSingleImportModalOpen(false);
+                    setSingleImportItem(null);
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Product Info Preview */}
+              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-white border border-slate-200 shrink-0">
+                  <Image
+                    src={singleImportItem.thumbnail || "/images/banners/hero-banner.png"}
+                    alt={singleImportItem.name}
+                    fill
+                    sizes="64px"
+                    className="object-cover"
+                    unoptimized
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-xs font-bold text-slate-900 line-clamp-2" title={singleImportItem.name}>
+                    {singleImportItem.name}
+                  </h4>
+                  <p className="text-[10px] text-slate-400 font-mono mt-1">
+                    SKU: {singleImportItem.sku || `HHC-${singleImportItem.id}`} &bull; {singleImportItem.hubName}
+                  </p>
+                  <div className="flex items-center gap-3 mt-1 text-[11px]">
+                    <span className="text-slate-500">Wholesale: <strong className="text-slate-800">Rs. {singleImportItem.wholesalePrice.toLocaleString()}</strong></span>
+                    <span className="text-emerald-700 font-bold">{singleImportItem.stock} in stock</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category & Subcategory Selection */}
+              <div className="space-y-3">
+                {/* 1. Main Category */}
+                <div>
+                  <label className="block text-xs font-black text-slate-800 mb-1">
+                    Store Department / Category <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={singleImportCategory}
+                    onChange={(e) => {
+                      const newCat = e.target.value;
+                      setSingleImportCategory(newCat);
+                      setSingleImportSubcategory("");
+                    }}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-pink cursor-pointer"
+                  >
+                    {categories
+                      .filter((c) => !c.parent_slug || c.parent_slug === "")
+                      .map((cat) => (
+                        <option key={cat.slug} value={cat.slug}>
+                          📁 {cat.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                {/* 2. Subcategory (Optional / Main Only) */}
+                <div>
+                  <label className="block text-xs font-black text-slate-800 mb-1">
+                    Subcategory <span className="text-slate-400 font-normal">(Optional or Main Category Only)</span>
+                  </label>
+                  <select
+                    value={singleImportSubcategory}
+                    onChange={(e) => setSingleImportSubcategory(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-pink cursor-pointer"
+                  >
+                    <option value="">-- None (Main Category Only) --</option>
+                    {subcategoriesList.map((sub) => (
+                      <option key={sub.slug} value={sub.slug}>
+                        ↳ {sub.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Pricing Fields */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Store Sale Price (PKR)
+                    </label>
+                    <input
+                      type="number"
+                      value={singleImportSalePrice}
+                      onChange={(e) => setSingleImportSalePrice(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-pink"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Strikethrough Price (PKR)
+                    </label>
+                    <input
+                      type="number"
+                      value={singleImportOriginalPrice}
+                      onChange={(e) => setSingleImportOriginalPrice(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-pink"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between text-xs">
+                  <span className="text-emerald-800 font-medium">Gross Profit Margin:</span>
+                  <span className="font-black text-emerald-700">
+                    +Rs. {profit.toLocaleString()} PKR ({Math.round((profit / (singleImportSalePrice || 1)) * 100)}%)
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={singleImporting}
+                  onClick={() => {
+                    setSingleImportModalOpen(false);
+                    setSingleImportItem(null);
+                  }}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={singleImporting || singleImportSalePrice <= 0}
+                  onClick={handleConfirmSingleImport}
+                  className="px-5 py-2.5 bg-brand-pink hover:bg-brand-pinkHover text-white text-xs font-black rounded-xl shadow-md shadow-brand-pink/20 transition flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {singleImporting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Saving to Catalogue...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>Confirm & Import Product</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

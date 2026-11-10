@@ -292,103 +292,152 @@ export async function hhcSyncAllLiveSuppliers(): Promise<{
 // --------------------------------------------------------------
 export async function hhcGetProductsBySupplier(
   storeId: number | string,
-  page: number = 1
+  page: number = 1,
+  pageSize: number = 100
 ): Promise<{
   success: boolean;
   data: HHCCatalogItem[];
   total: number;
   currentPage: number;
   lastPage: number;
+  pageSize: number;
 }> {
   const numericStoreId = Number(storeId);
+  const itemsPerHhcPage = 15;
+  const hhcPagesNeeded = Math.max(1, Math.ceil(pageSize / itemsPerHhcPage));
+  const startHhcPage = (page - 1) * hhcPagesNeeded + 1;
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    const url = `${HHC_BASE_URL}/products?storeID=${storeId}&page=${page}`;
-    const res = await fetch(url, {
-      method: "GET",
-      headers: getHeaders(),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
+    const promises: Promise<any>[] = [];
+    for (let p = startHhcPage; p < startHhcPage + hhcPagesNeeded; p++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 9000);
+      const url = `${HHC_BASE_URL}/products?storeID=${storeId}&page=${p}`;
+      promises.push(
+        fetch(url, {
+          method: "GET",
+          headers: getHeaders(),
+          signal: controller.signal,
+        })
+          .then((res) => {
+            clearTimeout(timeout);
+            return res.ok ? res.json() : null;
+          })
+          .catch(() => {
+            clearTimeout(timeout);
+            return null;
+          })
+      );
+    }
 
-    if (res.ok) {
-      const json = await res.json();
-      const rawProducts = json.data || (Array.isArray(json) ? json : []);
-      const totalCount = Number(json.total) || rawProducts.length;
-      const perPage = Number(json.per_page) || 15;
-      const calculatedLastPage = Math.max(1, Math.ceil(totalCount / perPage));
+    const results = await Promise.all(promises);
+    let rawProducts: any[] = [];
+    let totalCount = 0;
 
-      if (rawProducts.length > 0) {
-        const normalized: HHCCatalogItem[] = rawProducts.map((p: any) => {
-          const wholesale = parseFloat(p.wholesalePrice || p.price || 300);
-          let rawThumb = "";
-          if (typeof p.product_thumbnail === "string") {
-            rawThumb = p.product_thumbnail;
-          } else if (p.product_thumbnail && typeof p.product_thumbnail === "object") {
-            rawThumb = p.product_thumbnail.original_url || p.product_thumbnail.url || "";
-          }
-
-          if (!rawThumb && Array.isArray(p.product_galleries) && p.product_galleries.length > 0) {
-            const firstG = p.product_galleries[0];
-            rawThumb = typeof firstG === "string" ? firstG : firstG?.original_url || firstG?.url || "";
-          }
-
-          const thumb = (rawThumb || "/images/banners/hero-banner.png").replace(/^http:\/\//, "https://");
-
-          const gallery: string[] =
-            Array.isArray(p.product_galleries) && p.product_galleries.length > 0
-              ? p.product_galleries
-                  .map((g: any) =>
-                    (typeof g === "string" ? g : g?.original_url || g?.url || "").replace(/^http:\/\//, "https://")
-                  )
-                  .filter(Boolean)
-              : [thumb];
-
-          // Infer best matching category from product name
-          const nameLower = String(p.name || "").toLowerCase();
-          let category = "General";
-          if (nameLower.includes("toy") || nameLower.includes("kid") || nameLower.includes("baby") || nameLower.includes("puzzle") || nameLower.includes("game")) {
-            category = "Kids & Educational Toys";
-          } else if (nameLower.includes("watch") || nameLower.includes("strap") || nameLower.includes("bracelet") || nameLower.includes("wallet")) {
-            category = "Fashion & Watches";
-          } else if (nameLower.includes("tws") || nameLower.includes("earbud") || nameLower.includes("headphone") || nameLower.includes("cable") || nameLower.includes("charge")) {
-            category = "Smart Gadgets & Audio";
-          } else if (nameLower.includes("kitchen") || nameLower.includes("slicer") || nameLower.includes("bottle") || nameLower.includes("flask") || nameLower.includes("pump")) {
-            category = "Home & Kitchen Essentials";
-          } else if (nameLower.includes("bag") || nameLower.includes("backpack") || nameLower.includes("pencil") || nameLower.includes("craft") || nameLower.includes("stationery")) {
-            category = "Stationery & School Bags";
-          } else if (nameLower.includes("silk") || nameLower.includes("nighty") || nameLower.includes("gown") || nameLower.includes("robe") || nameLower.includes("kimono")) {
-            category = "Bridal Silk & Nightwear";
-          }
-
-          return {
-            id: Number(p.id),
-            name: String(p.name),
-            description: String(p.description || ""),
-            wholesalePrice: wholesale,
-            suggestedSalePrice: Math.round(wholesale + 500),
-            stock: Number(p.quantity || p.stock || 50),
-            stockStatus: (p.stock_status_name || "In stock") as any,
-            weight: parseFloat(p.weight || 0.5),
-            storeID: Number(p.store_id || numericStoreId),
-            storeName: String(p.store_name || "HHC Supplier"),
-            hubName: String(p.hub_name || "Karachi Hub"),
-            thumbnail: thumb,
-            gallery,
-            category,
-            sku: p.sku || `HHC-${p.id}`,
-          };
-        });
-        return {
-          success: true,
-          data: normalized,
-          total: totalCount,
-          currentPage: Number(json.current_page) || page,
-          lastPage: calculatedLastPage,
-        };
+    for (const json of results) {
+      if (json) {
+        if (Number(json.total) > totalCount) totalCount = Number(json.total);
+        const dataArr = json.data || (Array.isArray(json) ? json : []);
+        if (Array.isArray(dataArr)) {
+          rawProducts.push(...dataArr);
+        }
       }
+    }
+
+    // Deduplicate by ID
+    const seen = new Set<number>();
+    const dedupedRaw: any[] = [];
+    for (const item of rawProducts) {
+      const id = Number(item.id);
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        dedupedRaw.push(item);
+      }
+    }
+
+    if (totalCount === 0) totalCount = dedupedRaw.length;
+    const calculatedLastPage = Math.max(1, Math.ceil(totalCount / pageSize));
+
+    if (dedupedRaw.length > 0) {
+      const normalized: HHCCatalogItem[] = dedupedRaw.slice(0, pageSize).map((p: any) => {
+        const wholesale = parseFloat(p.wholesalePrice || p.price || 300);
+        let rawThumb = "";
+        if (typeof p.product_thumbnail === "string") {
+          rawThumb = p.product_thumbnail;
+        } else if (p.product_thumbnail && typeof p.product_thumbnail === "object") {
+          rawThumb = p.product_thumbnail.original_url || p.product_thumbnail.url || "";
+        }
+
+        if (!rawThumb && Array.isArray(p.product_galleries) && p.product_galleries.length > 0) {
+          const firstG = p.product_galleries[0];
+          rawThumb = typeof firstG === "string" ? firstG : firstG?.original_url || firstG?.url || "";
+        }
+
+        const thumb = (rawThumb || "/images/banners/hero-banner.png").replace(/^http:\/\//, "https://");
+
+        const gallery: string[] =
+          Array.isArray(p.product_galleries) && p.product_galleries.length > 0
+            ? p.product_galleries
+                .map((g: any) =>
+                  (typeof g === "string" ? g : g?.original_url || g?.url || "").replace(/^http:\/\//, "https://")
+                )
+                .filter(Boolean)
+            : [thumb];
+
+        // Infer best matching category from product name
+        const nameLower = String(p.name || "").toLowerCase();
+        let category = "General";
+        if (nameLower.includes("lip") || nameLower.includes("cream") || nameLower.includes("serum") || nameLower.includes("beauty") || nameLower.includes("whitening") || nameLower.includes("makeup") || nameLower.includes("cosmetic") || nameLower.includes("lotion") || nameLower.includes("face")) {
+          category = "Beauty & Personal Care";
+        } else if (nameLower.includes("toy") || nameLower.includes("kid") || nameLower.includes("baby") || nameLower.includes("puzzle") || nameLower.includes("game") || nameLower.includes("doll")) {
+          category = "Toys";
+        } else if (nameLower.includes("watch") || nameLower.includes("strap") || nameLower.includes("bracelet") || nameLower.includes("wallet") || nameLower.includes("fashion") || nameLower.includes("jewelry")) {
+          category = "Fashion";
+        } else if (nameLower.includes("tws") || nameLower.includes("earbud") || nameLower.includes("headphone") || nameLower.includes("cable") || nameLower.includes("charge") || nameLower.includes("led") || nameLower.includes("mobile")) {
+          category = "Electronics & Mobile";
+        } else if (nameLower.includes("kitchen") || nameLower.includes("slicer") || nameLower.includes("bottle") || nameLower.includes("flask") || nameLower.includes("pump") || nameLower.includes("cook") || nameLower.includes("knife")) {
+          category = "Kitchen";
+        } else if (nameLower.includes("bag") || nameLower.includes("backpack") || nameLower.includes("shoe") || nameLower.includes("footwear")) {
+          category = "Bags & Footwear";
+        } else if (nameLower.includes("gym") || nameLower.includes("fitness") || nameLower.includes("health") || nameLower.includes("slimming") || nameLower.includes("belt")) {
+          category = "Health & Fitness";
+        } else if (nameLower.includes("pen") || nameLower.includes("pencil") || nameLower.includes("stationery") || nameLower.includes("diary") || nameLower.includes("gift")) {
+          category = "Stationery & Gifts";
+        } else if (nameLower.includes("bed") || nameLower.includes("mat") || nameLower.includes("decor") || nameLower.includes("organizer") || nameLower.includes("carpet") || nameLower.includes("pillow")) {
+          category = "Home & Living";
+        } else if (nameLower.includes("pet") || nameLower.includes("garden") || nameLower.includes("plant") || nameLower.includes("cat") || nameLower.includes("dog")) {
+          category = "Pets & Garden";
+        } else if (nameLower.includes("tool") || nameLower.includes("auto") || nameLower.includes("car") || nameLower.includes("repair")) {
+          category = "Tools & Auto";
+        }
+
+        return {
+          id: Number(p.id),
+          name: String(p.name),
+          description: String(p.description || ""),
+          wholesalePrice: wholesale,
+          suggestedSalePrice: Math.round(wholesale + 500),
+          stock: Number(p.quantity || p.stock || 50),
+          stockStatus: (p.stock_status_name || "In stock") as any,
+          weight: parseFloat(p.weight || 0.5),
+          storeID: Number(p.store_id || numericStoreId),
+          storeName: String(p.store_name || "HHC Supplier"),
+          hubName: String(p.hub_name || "Karachi Hub"),
+          thumbnail: thumb,
+          gallery,
+          category,
+          sku: p.sku || `HHC-${p.id}`,
+        };
+      });
+
+      return {
+        success: true,
+        data: normalized,
+        total: totalCount,
+        currentPage: page,
+        lastPage: calculatedLastPage,
+        pageSize,
+      };
     }
   } catch {
     // fallback
@@ -400,12 +449,16 @@ export async function hhcGetProductsBySupplier(
   );
 
   const fallbackData = matched.length > 0 ? matched : HHC_CATALOG_PRODUCTS;
+  const startIdx = (page - 1) * pageSize;
+  const slicedFallback = fallbackData.slice(startIdx, startIdx + pageSize);
+
   return {
     success: true,
-    data: fallbackData,
+    data: slicedFallback.length > 0 ? slicedFallback : fallbackData.slice(0, pageSize),
     total: fallbackData.length,
-    currentPage: 1,
-    lastPage: Math.max(1, Math.ceil(fallbackData.length / 15)),
+    currentPage: page,
+    lastPage: Math.max(1, Math.ceil(fallbackData.length / pageSize)),
+    pageSize,
   };
 }
 
